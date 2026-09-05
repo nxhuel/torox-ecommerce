@@ -27,6 +27,8 @@ export interface Category {
   sortOrder: number
   createdAt: string
   updatedAt: string
+  /** Total products in this category incl. its subcategories. */
+  productCount?: number
 }
 
 export interface Product {

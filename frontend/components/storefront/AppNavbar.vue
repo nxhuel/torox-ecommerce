@@ -13,6 +13,8 @@ import {
   LogOut,
   Package,
   UserCircle,
+  Sun,
+  Moon,
 } from 'lucide-vue-next'
 import { useAuthStore } from '~/stores/auth'
 import { useCartStore } from '~/stores/cart'
@@ -23,6 +25,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const cart = useCartStore()
 const notifications = useNotificationsStore()
+const { isDark: isDarkTheme, toggle: toggleTheme } = useTheme()
 const toast = useToast()
 
 const searchQuery = ref('')
@@ -123,6 +126,16 @@ function logout() {
         </form>
 
         <div class="ml-auto flex items-center gap-1 sm:gap-2">
+          <!-- Theme toggle -->
+          <button
+            class="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100"
+            :aria-label="isDarkTheme ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'"
+            @click="toggleTheme()"
+          >
+            <Sun v-if="isDarkTheme" class="h-5 w-5" />
+            <Moon v-else class="h-5 w-5" />
+          </button>
+
           <!-- Guest -->
           <template v-if="!auth.isAuthenticated">
             <NuxtLink

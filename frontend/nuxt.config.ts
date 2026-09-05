@@ -37,6 +37,13 @@ export default defineNuxtConfig({
           href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap',
         },
       ],
+      script: [
+        {
+          // Apply the persisted theme before first paint to avoid a flash.
+          // Default is DARK; /admin always stays light.
+          innerHTML: `(function(){try{var t=localStorage.getItem('torox_theme');var dark=t==='light'?false:true;if(location.pathname.indexOf('/admin')===0){dark=false}var h=document.documentElement;if(dark){h.classList.add('dark')}else{h.classList.remove('dark')}}catch(e){document.documentElement.classList.add('dark')}})();`,
+        },
+      ],
     },
   },
   runtimeConfig: {

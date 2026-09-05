@@ -169,7 +169,7 @@ const activeCategory = computed(() =>
                 @click="categoryId = category.id; applyFilters()"
               >
                 <span>{{ category.name }}</span>
-                <span v-if="category.children?.length" class="text-xs text-slate-400">{{ category.children.length }}</span>
+                <span v-if="(category.productCount ?? 0) > 0" class="text-xs text-slate-400">{{ category.productCount }}</span>
               </button>
             </div>
           </div>

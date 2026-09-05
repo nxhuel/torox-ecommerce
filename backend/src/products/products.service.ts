@@ -31,7 +31,15 @@ export class ProductsService {
     if (search) {
       qb.andWhere('(p.name ILIKE :search OR p.brand ILIKE :search OR p.short_description ILIKE :search)', { search: `%${search}%` });
     }
-    if (categoryId) qb.andWhere('p.category_id = :categoryId', { categoryId });
+    if (categoryId) {
+      const categoryIds = await this.expandCategoryWithChildren(categoryId);
+      if (categoryIds.length) {
+        qb.andWhere('p.category_id IN (:...categoryIds)', { categoryIds });
+      } else {
+        // Category doesn't exist -> force empty result.
+        qb.andWhere('1 = 0');
+      }
+    }
     if (brand) qb.andWhere('p.brand ILIKE :brand', { brand: `%${brand}%` });
     if (minPrice !== undefined) qb.andWhere('p.price >= :minPrice', { minPrice });
     if (maxPrice !== undefined) qb.andWhere('p.price <= :maxPrice', { maxPrice });
@@ -117,6 +125,36 @@ export class ProductsService {
     const products = await this.repo.find({ where: { isActive: true } });
     const brands = [...new Set(products.map(p => p.brand).filter(Boolean))];
     return brands.sort();
+  }
+
+  /**
+   * Returns the given category id plus every descendant category id,
+   * so filtering by a parent category also matches products that live
+   * in its subcategories.
+   */
+  private async expandCategoryWithChildren(categoryId: string): Promise<string[]> {
+    const rows: { id: string; parent_id: string | null }[] = await this.repo.manager.query(
+      'SELECT id, parent_id FROM categories',
+    );
+    const childrenOf = new Map<string, string[]>();
+    for (const row of rows) {
+      if (row.parent_id) {
+        const list = childrenOf.get(row.parent_id) || [];
+        list.push(row.id);
+        childrenOf.set(row.parent_id, list);
+      }
+    }
+    const result: string[] = [];
+    const stack = [categoryId];
+    const visited = new Set<string>();
+    while (stack.length) {
+      const current = stack.pop()!;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      result.push(current);
+      for (const child of childrenOf.get(current) || []) stack.push(child);
+    }
+    return result;
   }
 
   private generateSlug(name: string): string {
