@@ -38,17 +38,17 @@ function isActive(path: string) {
             <span class="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-accent-500 font-bold text-white">
               {{ auth.user?.firstName?.[0] }}{{ auth.user?.lastName?.[0] }}
             </span>
-            <div class="leading-tight">
-              <p class="text-sm font-bold text-slate-900">{{ auth.user?.firstName }} {{ auth.user?.lastName }}</p>
+            <div class="min-w-0 leading-tight">
+              <p class="truncate text-sm font-bold text-slate-900">{{ auth.user?.firstName }} {{ auth.user?.lastName }}</p>
               <p class="text-xs text-slate-400">Cliente</p>
             </div>
           </div>
-          <nav class="flex gap-1 overflow-x-auto lg:flex-col">
+          <nav class="flex flex-wrap gap-1 lg:flex-col">
             <NuxtLink
               v-for="link in links"
               :key="link.to"
               :to="link.to"
-              class="relative flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition"
+              class="relative flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition lg:gap-2.5"
               :class="isActive(link.to) ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'"
             >
               <component :is="link.icon" class="h-4.5 w-4.5" />

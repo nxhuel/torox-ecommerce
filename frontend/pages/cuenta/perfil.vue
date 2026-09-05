@@ -72,24 +72,27 @@ async function changePassword() {
 
 <template>
   <div class="space-y-6">
-    <div class="flex items-center gap-4">
-      <span class="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
-        <UserCircle class="h-9 w-9" />
+    <div class="flex items-center gap-3 sm:gap-4">
+      <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 sm:h-16 sm:w-16">
+        <UserCircle class="h-8 w-8 sm:h-9 sm:w-9" />
       </span>
-      <div>
-        <h1 class="text-2xl font-bold text-slate-900">
+      <div class="min-w-0">
+        <h1 class="text-xl font-bold text-slate-900 sm:text-2xl">
           {{ auth.user?.firstName }} {{ auth.user?.lastName }}
         </h1>
-        <p class="flex items-center gap-1.5 text-sm text-slate-500">
-          <Mail class="h-3.5 w-3.5" /> {{ auth.user?.email }}
-          <span v-if="auth.user?.phone" class="ml-2 flex items-center gap-1">
+        <p class="flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
+          <span class="inline-flex min-w-0 items-center gap-1.5">
+            <Mail class="h-3.5 w-3.5 shrink-0" />
+            <span class="truncate">{{ auth.user?.email }}</span>
+          </span>
+          <span v-if="auth.user?.phone" class="inline-flex items-center gap-1">
             <Phone class="h-3.5 w-3.5" /> {{ auth.user.phone }}
           </span>
         </p>
       </div>
     </div>
 
-    <div class="card p-6">
+    <div class="card p-4 sm:p-6">
       <h2 class="mb-5 text-lg font-bold text-slate-900">Datos personales</h2>
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
@@ -118,7 +121,7 @@ async function changePassword() {
       </div>
     </div>
 
-    <div class="card p-6">
+    <div class="card p-4 sm:p-6">
       <h2 class="mb-5 text-lg font-bold text-slate-900">Cambiar contraseña</h2>
       <div class="grid gap-4 sm:grid-cols-3">
         <div>

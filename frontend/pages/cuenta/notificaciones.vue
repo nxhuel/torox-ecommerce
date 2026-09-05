@@ -37,7 +37,7 @@ const typeStyles: Record<string, string> = {
 
 <template>
   <div>
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-2">
       <h1 class="text-2xl font-bold text-slate-900">Notificaciones</h1>
       <button
         v-if="notifications.unread > 0"
@@ -56,7 +56,7 @@ const typeStyles: Record<string, string> = {
       <div
         v-for="notification in notifications.items"
         :key="notification.id"
-        class="flex gap-4 rounded-xl border p-4 transition"
+        class="flex gap-3 rounded-xl border p-4 transition sm:gap-4"
         :class="notification.isRead ? 'border-slate-200 bg-white' : 'border-brand-200 bg-brand-50/40'"
         :style="{ cursor: notification.link ? 'pointer' : 'default' }"
         @click="notification.link && markRead(notification.id)"
@@ -68,8 +68,8 @@ const typeStyles: Record<string, string> = {
           <component :is="typeIcons[notification.type] || Bell" class="h-5 w-5" />
         </span>
         <div class="min-w-0 flex-1">
-          <div class="flex items-center justify-between gap-2">
-            <p class="font-semibold text-slate-900">
+          <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <p class="min-w-0 font-semibold text-slate-900">
               {{ notification.title }}
               <span class="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
                 {{ NOTIFICATION_TYPE_LABELS[notification.type] || notification.type }}

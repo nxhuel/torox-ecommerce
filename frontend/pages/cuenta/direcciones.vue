@@ -80,14 +80,14 @@ function removeAddress(id: number) {
 
 <template>
   <div>
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-bold text-slate-900">Mis direcciones</h1>
-      <button class="btn-primary" @click="showForm = !showForm">
+      <button class="btn-primary !px-4" @click="showForm = !showForm">
         <Plus class="h-4 w-4" /> Nueva dirección
       </button>
     </div>
 
-    <form v-if="showForm" class="card mb-6 p-6">
+    <form v-if="showForm" class="card mb-6 p-4 sm:p-6">
       <h2 class="mb-4 text-lg font-bold text-slate-900">Nueva dirección</h2>
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
