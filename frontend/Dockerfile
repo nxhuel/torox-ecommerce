@@ -1,5 +1,9 @@
 FROM node:26-alpine AS builder
 WORKDIR /app
+# Render passes dashboard env vars as Docker build args — declare it so the
+# Nuxt client bundle is baked with the real API URL (fallback: local dev).
+ARG NUXT_PUBLIC_API_BASE
+ENV NUXT_PUBLIC_API_BASE=$NUXT_PUBLIC_API_BASE
 COPY package*.json ./
 RUN npm ci
 COPY . .
