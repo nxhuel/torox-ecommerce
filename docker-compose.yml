@@ -1,0 +1,43 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: torox_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Render Postgres (external host — the short hostname only resolves inside Render)
+      DATABASE_HOST: ${DATABASE_HOST:-dpg-dadmjgad0e5s73dhp0eg-a.oregon-postgres.render.com}
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_NAME: ${DATABASE_NAME:-torox_db}
+      DATABASE_USER: ${DATABASE_USER:-torox_user}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env (see .env.example)}
+      DATABASE_SSL: ${DATABASE_SSL:-true}
+      JWT_SECRET: ${JWT_SECRET:-torox_super_secret_jwt_key_2024_change_in_production}
+      JWT_EXPIRES_IN: 7d
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3001}
+    ports:
+      - '3000:3000'
+    volumes:
+      - backend_uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: torox_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE:-http://localhost:3000/api}
+      NUXT_PUBLIC_API_BASE_SERVER: ${NUXT_PUBLIC_API_BASE_SERVER:-http://backend:3000/api}
+    ports:
+      - '3001:3000'
+
+volumes:
+  backend_uploads:

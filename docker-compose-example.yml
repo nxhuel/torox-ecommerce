@@ -1,0 +1,63 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: torox_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: torox_db
+      POSTGRES_USER: torox_user
+      POSTGRES_PASSWORD: torox_pass_2024
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U torox_user -d torox_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: torox_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: torox_db
+      DATABASE_USER: torox_user
+      DATABASE_PASSWORD: torox_pass_2024
+      JWT_SECRET: torox_super_secret_jwt_key_2024_change_in_production
+      JWT_EXPIRES_IN: 7d
+      FRONTEND_URL: http://localhost:3001
+    ports:
+      - '3000:3000'
+    volumes:
+      - backend_uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: torox_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NUXT_PUBLIC_API_BASE: http://localhost:3000/api
+      NUXT_PUBLIC_API_BASE_SERVER: http://backend:3000/api
+    ports:
+      - '3001:3000'
+
+volumes:
+  postgres_data:
+  backend_uploads:

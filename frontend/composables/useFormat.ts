@@ -1,0 +1,92 @@
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  PENDING_PAYMENT: 'Pago pendiente',
+  PAYMENT_APPROVED: 'Pago aprobado',
+  PROCESSING: 'En preparación',
+  SHIPPED: 'Enviado',
+  DELIVERED: 'Entregado',
+  CANCELLED: 'Cancelado',
+}
+
+export const ORDER_STATUS_STYLES: Record<string, string> = {
+  PENDING_PAYMENT: 'bg-amber-50 text-amber-700 border-amber-200',
+  PAYMENT_APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  PROCESSING: 'bg-blue-50 text-blue-700 border-blue-200',
+  SHIPPED: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  DELIVERED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  CANCELLED: 'bg-red-50 text-red-700 border-red-200',
+}
+
+export const SHIPMENT_STATUS_LABELS: Record<string, string> = {
+  PREPARING: 'Preparando',
+  PICKED_UP: 'Retirado por Andreani',
+  IN_TRANSIT: 'En tránsito',
+  OUT_FOR_DELIVERY: 'En reparto',
+  DELIVERED: 'Entregado',
+}
+
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CREDIT_CARD: 'Tarjeta de crédito',
+  DEBIT_CARD: 'Tarjeta de débito',
+  BANK_TRANSFER: 'Transferencia bancaria',
+}
+
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  APPROVED: 'Aprobado',
+  PENDING: 'Pendiente',
+  REJECTED: 'Rechazado',
+}
+
+export const PROMOTION_TYPE_LABELS: Record<string, string> = {
+  PERCENTAGE_DISCOUNT: 'Descuento porcentual',
+  FIXED_DISCOUNT: 'Descuento fijo',
+  FREE_SHIPPING: 'Envío gratis',
+  SPECIAL_OFFER: 'Oferta especial',
+}
+
+export const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  PROMOTION: 'Promoción',
+  OFFER: 'Oferta',
+  ORDER_STATUS: 'Pedido',
+  SHIPMENT_STATUS: 'Envío',
+  SYSTEM: 'Sistema',
+}
+
+export const MOVEMENT_CATEGORY_LABELS: Record<string, string> = {
+  SALE: 'Venta',
+  MERCHANDISE: 'Mercadería',
+  LOGISTICS: 'Logística',
+  ADVERTISING: 'Publicidad',
+  SALARY: 'Sueldos',
+  OTHER: 'Otros',
+}
+
+export const useFormat = () => {
+  const currency = (value: number | string | null | undefined): string => {
+    const num = Number(value || 0)
+    return '$' + num.toLocaleString('es-AR', { maximumFractionDigits: 2 })
+  }
+
+  const date = (value: string | Date | null | undefined): string => {
+    if (!value) return '—'
+    const d = typeof value === 'string' ? new Date(value) : value
+    return d.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    })
+  }
+
+  const dateTime = (value: string | Date | null | undefined): string => {
+    if (!value) return '—'
+    const d = typeof value === 'string' ? new Date(value) : value
+    return d.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  return { currency, date, dateTime }
+}

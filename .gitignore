@@ -1,0 +1,18 @@
+# Secrets — never commit real DB credentials
+.env
+*.env
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+.nuxt/
+.output/
+.next/
+
+# Runtime data
+uploads/
+*.log
+.DS_Store
