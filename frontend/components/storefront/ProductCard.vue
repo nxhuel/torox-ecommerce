@@ -51,14 +51,15 @@ async function toggleFavorite() {
 </script>
 
 <template>
-  <div class="group relative flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover">
-    <NuxtLink :to="`/productos/${product.slug}`" class="relative block aspect-square overflow-hidden bg-slate-100">
+  <div class="group relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover hover:ring-2 hover:ring-brand-400/60">
+    <NuxtLink :to="`/productos/${product.slug}`" class="relative block aspect-square overflow-hidden">
       <AppImage
         :src="product.images?.[0]"
         :alt="product.name"
         :seed="product.slug"
-        class="h-full w-full transition-transform duration-500 group-hover:scale-105"
+        class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 group-hover:saturate-110"
       />
+      <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
       <div class="absolute left-3 top-3 flex flex-col gap-1.5">
         <span
           v-if="discount"
@@ -82,7 +83,7 @@ async function toggleFavorite() {
     </NuxtLink>
 
     <button
-      class="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow transition hover:text-red-500"
+      class="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow transition hover:scale-110 hover:text-red-500"
       :class="{ 'text-red-500': isFavorite }"
       :aria-label="isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'"
       @click="toggleFavorite"
@@ -91,12 +92,12 @@ async function toggleFavorite() {
     </button>
 
     <div class="flex flex-1 flex-col p-4">
-      <p v-if="product.brand" class="text-xs font-medium uppercase tracking-wide text-slate-400">
+      <p v-if="product.brand" class="text-xs font-bold uppercase tracking-wide text-brand-600">
         {{ product.brand }}
       </p>
       <NuxtLink
         :to="`/productos/${product.slug}`"
-        class="mt-1 line-clamp-2 min-h-[2.5rem] text-sm font-semibold text-slate-800 transition hover:text-brand-700"
+        class="mt-1 line-clamp-2 min-h-[2.5rem] text-sm font-bold text-slate-800 transition hover:text-brand-700"
       >
         {{ product.name }}
       </NuxtLink>

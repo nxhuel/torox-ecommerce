@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { Mail, Phone, MapPin, Instagram, Facebook, Linkedin } from 'lucide-vue-next'
+import { Instagram, Facebook, Music2, MessageCircle, Phone, Mail, MapPin } from 'lucide-vue-next'
 import logo from '~/assets/logo.png'
 </script>
 
 <template>
-  <footer class="mt-16 bg-dark-800 text-slate-300">
+  <footer class="mt-16 bg-dark-950 text-slate-300">
     <div class="container-torox grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
       <div>
         <div class="flex items-center gap-3">
@@ -22,7 +22,6 @@ import logo from '~/assets/logo.png'
           <li><NuxtLink to="/productos" class="transition hover:text-white">Productos</NuxtLink></li>
           <li><NuxtLink to="/productos?isOnSale=true" class="transition hover:text-white">Ofertas</NuxtLink></li>
           <li><NuxtLink to="/productos?isFeatured=true" class="transition hover:text-white">Destacados</NuxtLink></li>
-          <li><NuxtLink to="/carrito" class="transition hover:text-white">Mi carrito</NuxtLink></li>
         </ul>
       </div>
 
@@ -44,14 +43,41 @@ import logo from '~/assets/logo.png'
           <li class="flex items-center gap-2.5"><MapPin class="h-4 w-4 text-brand-400" /> Buenos Aires, Argentina</li>
         </ul>
         <div class="mt-4 flex gap-3">
-          <a href="#" class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 transition hover:bg-white/20" aria-label="Instagram">
-            <Instagram class="h-4 w-4" />
+          <a
+            href="https://www.instagram.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
+            aria-label="Instagram"
+          >
+            <Instagram class="h-4.5 w-4.5" />
           </a>
-          <a href="#" class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 transition hover:bg-white/20" aria-label="Facebook">
-            <Facebook class="h-4 w-4" />
+          <a
+            href="https://www.facebook.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
+            aria-label="Facebook"
+          >
+            <Facebook class="h-4.5 w-4.5" />
           </a>
-          <a href="#" class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 transition hover:bg-white/20" aria-label="LinkedIn">
-            <Linkedin class="h-4 w-4" />
+          <a
+            href="https://www.tiktok.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
+            aria-label="TikTok"
+          >
+            <Music2 class="h-4.5 w-4.5" />
+          </a>
+          <a
+            href="https://wa.me/5491100000000"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex h-10 w-10 items-center justify-center rounded-full bg-[\#25D366] text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
+            aria-label="WhatsApp"
+          >
+            <MessageCircle class="h-4.5 w-4.5" />
           </a>
         </div>
       </div>

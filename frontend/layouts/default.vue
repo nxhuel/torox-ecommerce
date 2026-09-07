@@ -21,6 +21,7 @@ onMounted(() => {
       <slot />
     </main>
     <AppFooter />
+    <WhatsappFloat />
     <ToastWidget />
   </div>
 </template>
