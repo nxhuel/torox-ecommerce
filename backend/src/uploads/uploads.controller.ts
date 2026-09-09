@@ -10,33 +10,17 @@ import {
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { extname } from 'path';
-import { randomUUID } from 'crypto';
-import * as fs from 'fs';
-import * as path from 'path';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
-const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
 const ALLOWED_MIME = [
   'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif',
   'video/mp4', 'video/webm', 'video/quicktime', 'video/ogg',
 ];
-
-const EXT_BY_MIME: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-  'image/avif': '.avif',
-  'video/mp4': '.mp4',
-  'video/webm': '.webm',
-  'video/quicktime': '.mov',
-  'video/ogg': '.ogv',
-};
 
 function fileFilter(_req: unknown, file: Express.Multer.File, cb: (error: Error | null, accept: boolean) => void) {
   if (!ALLOWED_MIME.includes(file.mimetype)) {
@@ -53,6 +37,8 @@ function fileFilter(_req: unknown, file: Express.Multer.File, cb: (error: Error 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 export class UploadsController {
+  constructor(private readonly cloudinary: CloudinaryService) {}
+
   /** Accepts one or many media files (images or videos) under the "images" field. */
   @Post()
   @UseInterceptors(
@@ -62,32 +48,27 @@ export class UploadsController {
       limits: { fileSize: MAX_VIDEO_SIZE, files: 12 },
     }),
   )
-  upload(@UploadedFiles() files: { images?: Express.Multer.File[] }) {
+  async upload(@UploadedFiles() files: { images?: Express.Multer.File[] }) {
     const images = files?.images || [];
     if (!images.length) {
       throw new BadRequestException('No se recibieron archivos');
     }
 
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    const results = await Promise.all(
+      images.map((file) => this.cloudinary.uploadBuffer(file, 'torox/products')),
+    );
 
-    const urls = images.map((file) => {
-      const ext = EXT_BY_MIME[file.mimetype] || extname(file.originalname) || '.jpg';
-      const filename = `${Date.now()}-${randomUUID()}${ext}`;
-      fs.writeFileSync(path.join(UPLOADS_DIR, filename), file.buffer);
-      return `/uploads/${filename}`;
-    });
-
-    return { urls };
+    return { urls: results.map((r) => r.url) };
   }
 
   @Delete(':filename')
-  remove(@Param('filename') filename: string) {
-    // Only allow plain filenames, no paths.
-    const safe = path.basename(filename);
-    const target = path.join(UPLOADS_DIR, safe);
-    if (fs.existsSync(target)) {
-      fs.unlinkSync(target);
-    }
+  async remove(@Param('filename') filename: string) {
+    // Extract the public_id from a Cloudinary URL or use the filename directly.
+    const publicId = filename.includes('/')
+      ? filename.replace(/\.[^.]+$/, '') // strip extension if full path
+      : `torox/products/${filename.replace(/\.[^.]+$/, '')}`;
+
+    await this.cloudinary.deleteFile(publicId);
     return { deleted: true };
   }
 }
