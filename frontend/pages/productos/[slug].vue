@@ -175,7 +175,7 @@ function isVideo(url: string) {
               :class="index === activeImage ? 'border-brand-600' : 'border-transparent hover:border-slate-300'"
               :aria-label="`Ver medio ${index + 1}`" @click="activeImage = index">
               <AppImage v-if="!isVideo(media)" :src="media" :alt="`${product.name} ${index + 1}`"
-                :seed="`${product.slug}-${index}`" class="h-20 w-20" />
+                :seed="`${product.slug}-${index}`" class="h-20 w-20 object-contain" />
               <span v-else class="flex h-20 w-20 items-center justify-center bg-dark-900">
                 <Video class="h-6 w-6 text-white" />
               </span>

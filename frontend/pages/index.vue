@@ -218,12 +218,12 @@ onMounted(async () => {
         <div v-if="loading" class="flex flex-1 gap-4 overflow-hidden">
           <BaseSkeleton v-for="i in 3" :key="i" class="h-60 w-48 shrink-0 !rounded-2xl sm:h-72 sm:w-64" />
         </div>
-        <div v-else class="flex flex-1 gap-3 overflow-hidden sm:gap-4">
+        <div v-else class="flex flex-1 gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth sm:gap-4 sm:overflow-hidden">
           <NuxtLink
             v-for="category in visibleCategories"
             :key="category.id"
             :to="`/productos?categoryId=${category.id}`"
-            class="group flex w-48 shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover sm:w-64"
+            class="group flex w-48 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover sm:w-64"
           >
             <div class="relative aspect-[4/3] overflow-hidden bg-slate-50">
               <AppImage
@@ -312,5 +312,16 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Hide scrollbar on mobile category carousel */
+@media (max-width: 639px) {
+  .snap-x::-webkit-scrollbar {
+    display: none;
+  }
+  .snap-x {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 </style>
