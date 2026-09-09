@@ -97,7 +97,7 @@ export const uploadsService = {
       method: 'POST',
       body: fd as any,
     })
-    return res.urls.map((u) => `${root}${u}`)
+    return res.urls.map((u) => (u.startsWith('http') ? u : `${root}${u}`))
   },
 }
 
