@@ -12,7 +12,7 @@ dist/
 .output/
 .next/
 
-# Runtime data
-uploads/
+# Runtime data — only ignore the top-level uploads/ dir used for saved files
+/uploads/
 *.log
 .DS_Store
