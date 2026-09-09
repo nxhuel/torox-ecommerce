@@ -34,7 +34,6 @@ watch(
     :src="current"
     :alt="alt"
     :loading="loading"
-    class="object-cover"
     @error="fallback"
   />
 </template>

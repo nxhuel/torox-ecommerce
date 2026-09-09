@@ -44,8 +44,8 @@ function toggle(index: number) {
 <template>
   <div>
     <div class="mx-auto mb-10 max-w-2xl text-center">
-      <span class="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-brand-600">
-        <HelpCircle class="h-4 w-4" />
+      <span class="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-brand-600 underline">
+        <!-- <HelpCircle class="h-4 w-4" /> -->
         Preguntas frecuentes
       </span>
       <h2 class="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">Todo lo que necesitás saber</h2>

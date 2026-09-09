@@ -20,6 +20,30 @@ import {
   ADMIN_PASSWORD,
   PROVINCES,
 } from './seed-data';
+import { SpecGroup } from '../../products/product-specs.types';
+
+/**
+ * Derives the grouped spec tables and the two highlight bullet points from
+ * the flat specifications of the seed data, so every demo product shows the
+ * "Lo que tenés que saber" and "Características del producto" sections.
+ */
+function deriveSpecsFromFlat(flat: Record<string, string>): {
+  specGroups: SpecGroup[];
+  highlights: string[];
+} {
+  const entries = Object.entries(flat || {});
+  const rows = entries.map(([label, value]) => ({ label, value }));
+  const half = Math.ceil(rows.length / 2);
+  const specGroups: SpecGroup[] = [];
+  if (rows.length) {
+    specGroups.push({ title: 'Características generales', rows: rows.slice(0, half) });
+    if (half < rows.length) {
+      specGroups.push({ title: 'Otras características', rows: rows.slice(half) });
+    }
+  }
+  const highlights = entries.slice(0, 2).map(([label, value]) => `${label}: ${value}`);
+  return { specGroups, highlights };
+}
 
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
@@ -139,6 +163,7 @@ export class SeedService implements OnApplicationBootstrap {
         stock: p.stock,
         images: p.images,
         specifications: p.specifications,
+        ...deriveSpecsFromFlat(p.specifications),
         isFeatured: p.isFeatured || false,
         isOnSale: p.isOnSale || false,
         discountPercentage: p.discountPercentage,

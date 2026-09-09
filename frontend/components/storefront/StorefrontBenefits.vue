@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { Truck, CreditCard, ShieldCheck } from 'lucide-vue-next'
+import Truck from '~/assets/icon-truck.png'
+import CreditCard from '~/assets/icon-pay.svg'
+import ShieldCheck from '~/assets/icon-security.svg'
 
 const benefits = [
   {
@@ -27,8 +29,8 @@ const benefits = [
       :key="benefit.title"
       class="flex items-center gap-4"
     >
-      <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-50">
-        <component :is="benefit.icon" class="h-6 w-6 text-brand-600" />
+      <div class="flex h-12 w-12 shrink-0 items-center justify-center">
+        <img :src="benefit.icon" :alt="benefit.title" class="h-12 w-12 object-contain" />
       </div>
       <div class="min-w-0">
         <p class="font-bold text-slate-900">{{ benefit.title }}</p>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Plus, Pencil, Trash2, Loader2, FolderTree, ChevronRight } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, Loader2, FolderTree, ChevronRight, ImagePlus, LoaderCircle } from 'lucide-vue-next'
 import type { Category } from '~/types'
-import { categoriesService } from '~/services'
+import { categoriesService, uploadsService } from '~/services'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
@@ -12,9 +12,11 @@ const loading = ref(true)
 const showModal = ref(false)
 const editing = ref<Category | null>(null)
 const saving = ref(false)
+const uploading = ref(false)
+const dragOver = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
 const form = reactive({
   name: '',
-  slug: '',
   description: '',
   imageUrl: '',
   parentId: '' as string,
@@ -37,7 +39,6 @@ function openCreate(parentId = '') {
   editing.value = null
   Object.assign(form, {
     name: '',
-    slug: '',
     description: '',
     imageUrl: '',
     parentId,
@@ -51,7 +52,6 @@ function openEdit(category: Category) {
   editing.value = category
   Object.assign(form, {
     name: category.name,
-    slug: category.slug,
     description: category.description || '',
     imageUrl: category.imageUrl || '',
     parentId: category.parentId || '',
@@ -61,6 +61,52 @@ function openEdit(category: Category) {
   showModal.value = true
 }
 
+async function uploadFiles(files: File[]) {
+  const valid = files.filter((f) => f.type.startsWith('image/'))
+  if (!valid.length) {
+    toast.error('Arrastrá o pegá imágenes (JPG, PNG, WebP...)')
+    return
+  }
+  uploading.value = true
+  try {
+    const urls = await uploadsService.images(valid.slice(0, 1))
+    form.imageUrl = urls[0]
+    toast.success('Imagen subida')
+  } catch (error: any) {
+    toast.error(error.message || 'No se pudo subir la imagen')
+  } finally {
+    uploading.value = false
+  }
+}
+
+function onFilePick(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  if (files.length) uploadFiles(files)
+  input.value = ''
+}
+
+function onDrop(event: DragEvent) {
+  dragOver.value = false
+  const files = Array.from(event.dataTransfer?.files || [])
+  if (files.length) uploadFiles(files)
+}
+
+function onGlobalPaste(event: ClipboardEvent) {
+  if (!showModal.value) return
+  const files = Array.from(event.clipboardData?.files || [])
+  if (files.length) {
+    event.preventDefault()
+    uploadFiles(files)
+  }
+}
+
+watch(showModal, (open) => {
+  if (open) window.addEventListener('paste', onGlobalPaste)
+  else window.removeEventListener('paste', onGlobalPaste)
+})
+onUnmounted(() => window.removeEventListener('paste', onGlobalPaste))
+
 async function save() {
   if (!form.name) {
     toast.error('El nombre es obligatorio')
@@ -69,7 +115,6 @@ async function save() {
   saving.value = true
   const payload: Record<string, unknown> = {
     name: form.name,
-    slug: form.slug || undefined,
     description: form.description || undefined,
     imageUrl: form.imageUrl || undefined,
     parentId: form.parentId || undefined,
@@ -130,9 +175,7 @@ async function remove(category: Category) {
           </div>
           <div class="min-w-0 flex-1">
             <p class="font-bold text-slate-900">{{ category.name }}</p>
-            <p class="truncate text-xs text-slate-400">
-              /{{ category.slug }} <span v-if="category.description">• {{ category.description }}</span>
-            </p>
+            <p v-if="category.description" class="truncate text-xs text-slate-400">{{ category.description }}</p>
           </div>
           <span class="hidden rounded-full px-2 py-0.5 text-xs font-semibold sm:block" :class="category.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'">
             {{ category.isActive ? 'Activa' : 'Inactiva' }}
@@ -155,7 +198,6 @@ async function remove(category: Category) {
             <div v-for="child in category.children" :key="child.id" class="flex items-center gap-3 rounded-lg bg-white px-3 py-2">
               <FolderTree class="h-4 w-4 shrink-0 text-slate-300" />
               <span class="flex-1 text-sm font-medium text-slate-700">{{ child.name }}</span>
-              <span class="text-xs text-slate-400">/{{ child.slug }}</span>
               <div class="flex gap-1">
                 <button class="rounded p-1.5 text-slate-400 hover:text-brand-600" aria-label="Editar" @click="openEdit(child)">
                   <Pencil class="h-3.5 w-3.5" />
@@ -190,16 +232,30 @@ async function remove(category: Category) {
           <input v-model="form.name" class="input-base" placeholder="Cámaras" />
         </div>
         <div>
-          <label class="label-base">Slug (URL)</label>
-          <input v-model="form.slug" class="input-base font-mono" placeholder="camaras" />
-        </div>
-        <div>
           <label class="label-base">Descripción</label>
           <textarea v-model="form.description" rows="2" class="input-base" />
         </div>
         <div>
-          <label class="label-base">Imagen (URL)</label>
-          <input v-model="form.imageUrl" class="input-base" placeholder="https://..." />
+          <label class="label-base">Imagen</label>
+          <div
+            class="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition"
+            :class="dragOver ? 'border-brand-500 bg-brand-50/50' : 'border-slate-300 hover:border-brand-400 hover:bg-brand-50/30'"
+            @click="fileInput?.click()"
+            @dragover.prevent="dragOver = true"
+            @dragleave.prevent="dragOver = false"
+            @drop.prevent="onDrop"
+          >
+            <LoaderCircle v-if="uploading" class="h-7 w-7 animate-spin text-brand-600" />
+            <template v-else-if="form.imageUrl">
+              <AppImage :src="form.imageUrl" alt="Imagen de la categoría" class="h-16 w-16 rounded-lg" />
+              <p class="text-xs text-slate-400">Hacé clic para reemplazarla, arrastrala o pegala con Ctrl + V</p>
+            </template>
+            <template v-else>
+              <ImagePlus class="h-7 w-7 text-slate-400" />
+              <p class="text-sm font-medium text-slate-600">Hacé clic, arrastrá o pegá la imagen con Ctrl + V</p>
+            </template>
+            <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFilePick" />
+          </div>
         </div>
         <div>
           <label class="label-base">Categoría padre</label>

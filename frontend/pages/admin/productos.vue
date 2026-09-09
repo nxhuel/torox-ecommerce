@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Plus, Pencil, Trash2, Search, Loader2, Package, Star } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, Search, Loader2, Package, Star, ImagePlus, LoaderCircle, ChevronLeft, Video } from 'lucide-vue-next'
 import type { Category, Product } from '~/types'
-import { categoriesService, productsService } from '~/services'
+import { categoriesService, productsService, uploadsService } from '~/services'
 import { useFormat } from '~/composables/useFormat'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
@@ -20,6 +20,9 @@ const limit = 12
 const showModal = ref(false)
 const editing = ref<Product | null>(null)
 const saving = ref(false)
+const dragOver = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
 
 const form = reactive({
   name: '',
@@ -30,11 +33,9 @@ const form = reactive({
   discountPercentage: null as number | null,
   cost: null as number | null,
   stock: 0,
-  shortDescription: '',
   description: '',
   images: [] as string[],
-  imageInput: '',
-  specificationsText: '',
+  highlights: ['', ''] as string[],
   isFeatured: false,
   isOnSale: false,
   isActive: true,
@@ -77,15 +78,14 @@ function openCreate() {
     discountPercentage: null,
     cost: null,
     stock: 0,
-    shortDescription: '',
     description: '',
     images: [],
-    imageInput: '',
-    specificationsText: '',
+    highlights: ['', ''],
     isFeatured: false,
     isOnSale: false,
     isActive: true,
   })
+  uploading.value = false
   showModal.value = true
 }
 
@@ -100,28 +100,86 @@ function openEdit(product: Product) {
     discountPercentage: product.discountPercentage != null ? Number(product.discountPercentage) : null,
     cost: product.cost != null ? Number(product.cost) : null,
     stock: product.stock,
-    shortDescription: product.shortDescription || '',
     description: product.description || '',
     images: [...(product.images || [])],
-    imageInput: '',
-    specificationsText: product.specifications ? Object.entries(product.specifications).map(([k, v]) => `${k}: ${v}`).join('\n') : '',
+    highlights: [...(product.highlights || [])].slice(0, 2),
     isFeatured: product.isFeatured,
     isOnSale: product.isOnSale,
     isActive: product.isActive,
   })
+  while (form.highlights.length < 2) form.highlights.push('')
   showModal.value = true
-}
-
-function addImage() {
-  const url = form.imageInput.trim()
-  if (url) {
-    form.images.push(url)
-    form.imageInput = ''
-  }
 }
 
 function removeImage(index: number) {
   form.images.splice(index, 1)
+}
+
+function moveImage(index: number, direction: -1 | 1) {
+  const target = index + direction
+  if (target < 0 || target >= form.images.length) return
+  const images = [...form.images]
+  ;[images[index], images[target]] = [images[target], images[index]]
+  form.images = images
+}
+
+async function uploadFiles(files: File[]) {
+  const valid = files.filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/'))
+  if (!valid.length) {
+    toast.error('Arrastrá o pegá imágenes (JPG, PNG, WebP...) o videos (MP4, WebM)')
+    return
+  }
+  if (form.images.length + valid.length > 12) {
+    toast.error('Máximo 12 archivos por producto')
+    return
+  }
+  uploading.value = true
+  try {
+    const urls = await uploadsService.images(valid)
+    form.images.push(...urls)
+    toast.success(`${urls.length} archivo${urls.length > 1 ? 's' : ''} subido${urls.length > 1 ? 's' : ''}`)
+  } catch (error: any) {
+    toast.error(error.message || 'No se pudieron subir los archivos')
+  } finally {
+    uploading.value = false
+  }
+}
+
+function onFilePick(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  if (files.length) uploadFiles(files)
+  input.value = ''
+}
+
+function onDrop(event: DragEvent) {
+  dragOver.value = false
+  const files = Array.from(event.dataTransfer?.files || [])
+  if (files.length) uploadFiles(files)
+}
+
+function onPaste(event: ClipboardEvent) {
+  const files = Array.from(event.clipboardData?.files || [])
+  if (files.length) {
+    event.preventDefault()
+    uploadFiles(files)
+  }
+}
+
+/** Paste works even when focus is not inside the modal (BaseModal teleports to body). */
+function onGlobalPaste(event: ClipboardEvent) {
+  if (!showModal.value) return
+  onPaste(event)
+}
+
+watch(showModal, (open) => {
+  if (open) window.addEventListener('paste', onGlobalPaste)
+  else window.removeEventListener('paste', onGlobalPaste)
+})
+onUnmounted(() => window.removeEventListener('paste', onGlobalPaste))
+
+function isVideo(url: string) {
+  return /\.(mp4|webm|mov|ogv)(\?.*)?$/i.test(url)
 }
 
 async function save() {
@@ -130,15 +188,7 @@ async function save() {
     return
   }
   saving.value = true
-  const specs: Record<string, string> = {}
-  form.specificationsText
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .forEach((line) => {
-      const [key, ...rest] = line.split(':')
-      if (key && rest.length) specs[key.trim()] = rest.join(':').trim()
-    })
+  const highlights = form.highlights.map((h) => h.trim()).filter(Boolean).slice(0, 2)
 
   const payload = {
     name: form.name,
@@ -149,10 +199,9 @@ async function save() {
     discountPercentage: form.discountPercentage != null ? Number(form.discountPercentage) : undefined,
     cost: form.cost != null ? Number(form.cost) : undefined,
     stock: Number(form.stock),
-    shortDescription: form.shortDescription || undefined,
     description: form.description || undefined,
     images: form.images.length ? form.images : undefined,
-    specifications: Object.keys(specs).length ? specs : undefined,
+    highlights: highlights.length ? highlights : undefined,
     isFeatured: form.isFeatured,
     isOnSale: form.isOnSale,
     isActive: form.isActive,
@@ -292,13 +341,13 @@ function categoryName(id: string) {
 
     <!-- Modal -->
     <BaseModal :open="showModal" :title="editing ? 'Editar producto' : 'Nuevo producto'" size="lg" @close="showModal = false">
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-4 sm:grid-cols-2" @paste="onPaste">
         <div class="sm:col-span-2">
-          <label class="label-base">Nombre *</label>
+          <label class="label-base">Producto *</label>
           <input v-model="form.name" class="input-base" placeholder="Cámara IP WiFi 2K" />
         </div>
         <div>
-          <label class="label-base">Marca</label>
+          <label class="label-base">Modelo</label>
           <input v-model="form.brand" class="input-base" placeholder="Hikvision" />
         </div>
         <div>
@@ -328,51 +377,68 @@ function categoryName(id: string) {
           <input v-model.number="form.discountPercentage" type="number" min="0" max="100" class="input-base" />
         </div>
         <div>
-          <label class="label-base">Costo</label>
-          <input v-model.number="form.cost" type="number" min="0" class="input-base" />
-        </div>
-        <div>
           <label class="label-base">Stock</label>
           <input v-model.number="form.stock" type="number" min="0" class="input-base" />
         </div>
         <div class="sm:col-span-2">
-          <label class="label-base">Descripción corta</label>
-          <input v-model="form.shortDescription" class="input-base" />
+          <label class="label-base">Foto/s</label>
+          <div
+            class="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition"
+            :class="dragOver ? 'border-brand-500 bg-brand-50/50' : 'border-slate-300 hover:border-brand-400 hover:bg-brand-50/30'"
+            @click="fileInput?.click()"
+            @dragover.prevent="dragOver = true"
+            @dragleave.prevent="dragOver = false"
+            @drop.prevent="onDrop"
+          >
+            <LoaderCircle v-if="uploading" class="h-8 w-8 animate-spin text-brand-600" />
+            <ImagePlus v-else class="h-8 w-8 text-slate-400" />
+            <p class="text-sm font-medium text-slate-600">
+              {{ uploading ? 'Subiendo imágenes...' : 'Hacé clic para elegir imágenes, arrastralas acá o pegalas con Ctrl + V' }}
+            </p>
+            <p class="text-xs text-slate-400">JPG, PNG, WebP, GIF, MP4, WebM • hasta 5MB (imgs) / 50MB (videos) • máx. 12</p>
+            <input ref="fileInput" type="file" accept="image/*,video/*" multiple class="hidden" @change="onFilePick" />
+          </div>
+          <div v-if="form.images.length" class="mt-2 flex flex-wrap gap-2">
+            <div v-for="(image, index) in form.images" :key="image" class="relative">
+              <AppImage v-if="!isVideo(image)" :src="image" :alt="`archivo ${index + 1}`" class="h-16 w-16 rounded-lg border border-slate-200" />
+              <div v-else class="flex h-16 w-16 items-center justify-center rounded-lg border border-slate-200 bg-slate-900">
+                <Video class="h-6 w-6 text-white" />
+              </div>
+              <button class="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white" aria-label="Quitar" @click="removeImage(index)">
+                <Trash2 class="h-3 w-3" />
+              </button>
+              <button
+                v-if="index > 0"
+                class="absolute -left-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-white"
+                aria-label="Mover izquierda"
+                @click="moveImage(index, -1)"
+              >
+                <ChevronLeft class="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+          <p v-if="form.images.length" class="mt-1 text-xs text-slate-400">La primera imagen es la principal.</p>
+        </div>
+        <div class="sm:col-span-2 rounded-xl border border-slate-200 p-4">
+          <label class="label-base">Lo que tenés que saber de este producto (2 puntos principales)</label>
+          <input v-model="form.highlights[0]" class="input-base mb-2" placeholder="Ej: Resolución 4MP con visión nocturna en color" />
+          <input v-model="form.highlights[1]" class="input-base" placeholder="Ej: Audio bidireccional y detección de movimiento" />
         </div>
         <div class="sm:col-span-2">
           <label class="label-base">Descripción</label>
           <textarea v-model="form.description" rows="3" class="input-base" />
-        </div>
-        <div class="sm:col-span-2">
-          <label class="label-base">Imágenes</label>
-          <div class="flex gap-2">
-            <input v-model="form.imageInput" class="input-base" placeholder="https://..." @keydown.enter.prevent="addImage" />
-            <button class="btn-secondary shrink-0" @click="addImage">Agregar</button>
-          </div>
-          <div v-if="form.images.length" class="mt-2 flex flex-wrap gap-2">
-            <div v-for="(image, index) in form.images" :key="index" class="relative">
-              <AppImage :src="image" :alt="`imagen ${index + 1}`" class="h-16 w-16 rounded-lg border border-slate-200" />
-              <button class="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white" aria-label="Quitar" @click="removeImage(index)">
-                <Trash2 class="h-3 w-3" />
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="sm:col-span-2">
-          <label class="label-base">Especificaciones (formato: clave: valor, una por línea)</label>
-          <textarea v-model="form.specificationsText" rows="3" class="input-base font-mono !text-xs" placeholder="Resolución: 4MP&#10;Visibilidad nocturna: 30m" />
         </div>
         <label class="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
           <input v-model="form.isFeatured" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-brand-600" />
           Producto destacado
         </label>
         <label class="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
-          <input v-model="form.isOnSale" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-red-600" />
-          En oferta
-        </label>
-        <label class="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
           <input v-model="form.isActive" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-brand-600" />
           Activo
+        </label>
+        <label class="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
+          <input v-model="form.isOnSale" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-red-600" />
+          En oferta
         </label>
       </div>
       <template #footer>

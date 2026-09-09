@@ -15,6 +15,7 @@ import { PromotionsModule } from './promotions/promotions.module';
 import { FinanceModule } from './finance/finance.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SeedModule } from './database/seed/seed.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { SeedModule } from './database/seed/seed.module';
     FinanceModule,
     DashboardModule,
     SeedModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}

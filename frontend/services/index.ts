@@ -1,4 +1,5 @@
 import { useApi } from '~/composables/useApi'
+import { useRuntimeConfig } from '#app'
 import type {
   Category,
   DashboardMetrics,
@@ -80,6 +81,24 @@ export const productsService = {
     api().api<Product>(`/products/${id}`, { method: 'PATCH', body: data }),
   remove: (id: string) => api().api(`/products/${id}`, { method: 'DELETE' }),
   lowStock: (threshold = 5) => api().api<Product[]>(`/products/low-stock?threshold=${threshold}`),
+}
+
+/* ---------- Uploads ---------- */
+export const uploadsService = {
+  /** Uploads one or many image files and returns their public URLs. */
+  images: async (files: File[]): Promise<string[]> => {
+    if (!files.length) return []
+    const config = useRuntimeConfig()
+    const base = config.public.apiBase as string
+    const root = base.replace(/\/api\/?$/, '')
+    const fd = new FormData()
+    files.forEach((file) => fd.append('images', file))
+    const res = await api().api<{ urls: string[] }>('/uploads', {
+      method: 'POST',
+      body: fd as any,
+    })
+    return res.urls.map((u) => `${root}${u}`)
+  },
 }
 
 /* ---------- Cart ---------- */

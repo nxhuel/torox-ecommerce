@@ -43,7 +43,7 @@ const discount = computed(() => {
     </span>
     <span
       v-if="discount"
-      class="rounded bg-red-50 px-1.5 py-0.5 text-xs font-bold text-red-600"
+      class="rounded bg-green-50 px-1.5 py-0.5 text-xs font-bold text-green-600"
     >
       {{ discount }}% OFF
     </span>

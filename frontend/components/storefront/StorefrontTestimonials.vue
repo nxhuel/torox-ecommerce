@@ -67,8 +67,8 @@ function scrollByCard(direction: 1 | -1) {
   <section class="py-14 lg:py-20">
     <div class="container-torox">
       <div class="mx-auto mb-10 max-w-2xl text-center">
-        <span class="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-brand-600">
-          <Star class="h-4 w-4 fill-current text-yellow-400" />
+        <span class="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-brand-600 underline">
+          <!-- <Star class="h-4 w-4 fill-current text-yellow-400" /> -->
           Opiniones verificadas
         </span>
         <h2 class="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">Lo que opinan nuestros clientes</h2>

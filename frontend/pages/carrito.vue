@@ -22,7 +22,7 @@ async function removeItem(itemId: string) {
 }
 
 function productLink(item: any) {
-  return `/productos/${item.productSnapshot?.slug || item.productId}`
+  return `/especificacion/${item.productSnapshot?.slug || item.productId}`
 }
 
 function productName(item: any) {

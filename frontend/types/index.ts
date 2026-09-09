@@ -1,5 +1,15 @@
 export type UserRole = 'ADMIN' | 'CUSTOMER'
 
+export interface SpecRow {
+  label: string
+  value: string
+}
+
+export interface SpecGroup {
+  title: string
+  rows: SpecRow[]
+}
+
 export interface User {
   id: string
   email: string
@@ -47,6 +57,8 @@ export interface Product {
   stock: number
   images: string[]
   specifications?: Record<string, string> | null
+  highlights?: string[] | null
+  specGroups?: SpecGroup[] | null
   isFeatured: boolean
   isOnSale: boolean
   discountPercentage?: number | null

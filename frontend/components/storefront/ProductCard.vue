@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ShoppingCart, Heart, Check } from 'lucide-vue-next'
+import { ShoppingCart, Heart, Check, Star } from 'lucide-vue-next'
 import type { Product } from '~/types'
 import { useAuthStore } from '~/stores/auth'
 import { useCartStore } from '~/stores/cart'
@@ -48,79 +48,68 @@ async function toggleFavorite() {
     toast.error(error.message)
   }
 }
-</script>
-
-<template>
-  <div class="group relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover hover:ring-2 hover:ring-brand-400/60">
-    <NuxtLink :to="`/productos/${product.slug}`" class="relative block aspect-square overflow-hidden">
-      <AppImage
-        :src="product.images?.[0]"
-        :alt="product.name"
-        :seed="product.slug"
-        class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 group-hover:saturate-110"
-      />
-      <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+</script><template>
+  <div
+    class="group relative flex flex-col overflow-hidden rounded-xl transition-all duration-200 hover:-translate-y-0.5"
+    :class="product.isFeatured
+      ? 'bg-white ring-1 ring-slate-200/80 shadow-card dark:bg-dark-800 dark:ring-white/10'
+      : 'bg-white ring-1 ring-slate-200/60 shadow-sm dark:bg-dark-800 dark:ring-white/5'
+      ">
+    <!-- Featured top ribbon -->
+    <NuxtLink :to="`/especificacion/${product.slug}`" class="relative block aspect-square overflow-hidden !bg-white">
+      <AppImage :src="product.images?.[0]" :alt="product.name" :seed="product.slug" class="h-full w-full object-contain" />
       <div class="absolute left-3 top-3 flex flex-col gap-1.5">
-        <span
-          v-if="discount"
-          class="rounded-md bg-red-600 px-2 py-0.5 text-xs font-bold text-white shadow"
-        >
+        <span v-if="discount" class="rounded-md bg-green-500 px-2 py-0.5 text-xs font-bold text-white">
           {{ discount }}% OFF
         </span>
-        <span
-          v-else-if="product.isFeatured"
-          class="rounded-md bg-brand-600 px-2 py-0.5 text-xs font-bold text-white shadow"
-        >
-          Destacado
+        <span v-else-if="product.isFeatured"
+          class="flex items-center gap-1 rounded-md bg-slate-900 px-2 py-0.5 text-xs font-bold text-white dark:bg-white dark:text-slate-900">
+          <Star class="h-3 w-3" fill="currentColor" /> Destacado
         </span>
       </div>
-      <span
-        v-if="!product.isInStock"
-        class="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-[2px]"
-      >
-        <span class="rounded-lg bg-dark-800 px-4 py-1.5 text-sm font-bold text-white">Agotado</span>
+      <span v-if="!product.isInStock"
+        class="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-[2px] dark:bg-dark-900/80">
+        <span
+          class="rounded-lg bg-slate-800 px-4 py-1.5 text-sm font-bold text-white dark:bg-slate-200 dark:text-slate-900">Agotado</span>
       </span>
     </NuxtLink>
 
     <button
-      class="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow transition hover:scale-110 hover:text-red-500"
-      :class="{ 'text-red-500': isFavorite }"
-      :aria-label="isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'"
-      @click="toggleFavorite"
-    >
-      <Heart class="h-4.5 w-4.5" :fill="isFavorite ? 'currentColor' : 'none'" />
+      class="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-400 shadow-sm transition hover:scale-105 hover:text-red-500 dark:bg-dark-800/90 dark:text-slate-500"
+      :class="{ '!text-red-500': isFavorite }" :aria-label="isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'"
+      @click="toggleFavorite">
+      <Heart class="h-4 w-4" :fill="isFavorite ? 'currentColor' : 'none'" />
     </button>
 
-    <div class="flex flex-1 flex-col p-4">
-      <p v-if="product.brand" class="text-xs font-bold uppercase tracking-wide text-brand-600">
+    <div class="flex flex-1 flex-col p-3.5">
+      <p v-if="product.brand"
+        class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
         {{ product.brand }}
       </p>
-      <NuxtLink
-        :to="`/productos/${product.slug}`"
-        class="mt-1 line-clamp-2 min-h-[2.5rem] text-sm font-bold text-slate-800 transition hover:text-brand-700"
-      >
+      <NuxtLink :to="`/especificacion/${product.slug}`"
+        class="mt-1 line-clamp-2 min-h-[2.5rem] text-sm font-semibold text-slate-800 transition hover:text-slate-600 dark:text-slate-200 dark:hover:text-white">
         {{ product.name }}
       </NuxtLink>
 
-      <div class="mt-3 flex items-end justify-between gap-2">
-        <div>
-          <PriceTag :price="product.finalPrice" :original-price="product.originalPrice" size="sm" />
-          <p class="mt-0.5 text-[11px] text-slate-400">
-            {{ product.isInStock ? `${product.stock} disponibles` : 'Sin stock' }}
-          </p>
-        </div>
+      <div class="mt-auto pt-3">
+        <PriceTag :price="product.finalPrice" :original-price="product.originalPrice" size="sm" />
+        <p class="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+          {{ product.isInStock ? `${product.stock} disponibles` : 'Sin stock' }}
+        </p>
       </div>
 
-      <button
-        class="btn-primary mt-3 w-full !py-2"
-        :class="{ '!bg-emerald-600 hover:!bg-emerald-700': added }"
-        :disabled="!product.isInStock"
-        @click="addToCart"
-      >
-        <Check v-if="added" class="h-4 w-4" />
-        <ShoppingCart v-else class="h-4 w-4" />
-        {{ added ? 'Agregado' : product.isInStock ? 'Agregar al carrito' : 'Sin stock' }}
-      </button>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button
+          class="rounded-lg py-2 text-sm font-semibold text-white transition hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          :style="{ backgroundColor: '#3483FA' }" :disabled="!product.isInStock" @click="addToCart">
+          Comprar ahora
+        </button>
+        <button
+          class="rounded-lg py-2 text-sm font-semibold text-[#3483FA] transition hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          :style="{ backgroundColor: '#E3EDFB' }" :disabled="!product.isInStock" @click="addToCart">
+          {{ added ? 'Agregado' : 'Agregar al carrito' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>

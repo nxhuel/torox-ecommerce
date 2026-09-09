@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { Instagram, Facebook, Music2, MessageCircle, Phone, Mail, MapPin } from 'lucide-vue-next'
+import { Phone, Mail, MapPin } from 'lucide-vue-next'
+import Instagram from '~/assets/icon-instagram.png'
+import Facebook from '~/assets/icon-facebook.png'
+import TikTok from '~/assets/icon-tiktok.png'
+import WhatsApp from '~/assets/icon-wspp.png'
 import logo from '~/assets/logo.png'
 </script>
 
@@ -38,46 +42,46 @@ import logo from '~/assets/logo.png'
       <div>
         <h4 class="text-sm font-bold uppercase tracking-wider text-white">Contacto</h4>
         <ul class="mt-4 space-y-2.5 text-sm">
-          <li class="flex items-center gap-2.5"><Phone class="h-4 w-4 text-brand-400" /> 0800-555-TOROX</li>
+          <li class="flex items-center gap-2.5"><Phone class="h-4 w-4 text-brand-400" /> +54 9 11 3735-1341</li>
           <li class="flex items-center gap-2.5"><Mail class="h-4 w-4 text-brand-400" /> hola@torox.com.ar</li>
           <li class="flex items-center gap-2.5"><MapPin class="h-4 w-4 text-brand-400" /> Buenos Aires, Argentina</li>
         </ul>
-        <div class="mt-4 flex gap-3">
+        <div class="mt-8 flex gap-3">
           <a
-            href="https://www.instagram.com/"
+            href="https://www.instagram.com/torox.arg/"
             target="_blank"
             rel="noopener noreferrer"
             class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
             aria-label="Instagram"
           >
-            <Instagram class="h-4.5 w-4.5" />
+            <img :src="Instagram" alt="Instagram" class="h-4.5 w-4.5" />
           </a>
           <a
-            href="https://www.facebook.com/"
+            href="https://www.facebook.com/profile.php?id=61593927764597"
             target="_blank"
             rel="noopener noreferrer"
             class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
             aria-label="Facebook"
           >
-            <Facebook class="h-4.5 w-4.5" />
+            <img :src="Facebook" alt="Facebook" class="h-4.5 w-4.5" />
           </a>
           <a
-            href="https://www.tiktok.com/"
+            href="https://www.tiktok.com/@torox.arg"
             target="_blank"
             rel="noopener noreferrer"
             class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
             aria-label="TikTok"
           >
-            <Music2 class="h-4.5 w-4.5" />
+            <img :src="TikTok" alt="TikTok" class="h-4.5 w-4.5" />
           </a>
           <a
-            href="https://wa.me/5491100000000"
+            href="https://wa.me/5491133414517?text=Hola!%20Quisiera%20saber%20m%C3%A1s%20informaci%C3%B3n%20sobre%20sus%20productos."
             target="_blank"
             rel="noopener noreferrer"
             class="flex h-10 w-10 items-center justify-center rounded-full bg-[\#25D366] text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
             aria-label="WhatsApp"
           >
-            <MessageCircle class="h-4.5 w-4.5" />
+            <img :src="WhatsApp" alt="WhatsApp" class="h-4.5 w-4.5" />
           </a>
         </div>
       </div>

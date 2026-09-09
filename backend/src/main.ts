@@ -1,14 +1,19 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import * as path from 'path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['log', 'error', 'warn', 'debug'],
   });
+
+  // Serve uploaded images as static files.
+  app.useStaticAssets(path.resolve(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3001',

@@ -9,6 +9,7 @@ import {
   AfterLoad,
 } from 'typeorm';
 import { Category } from '../../categories/entities/category.entity';
+import { SpecGroup } from '../product-specs.types';
 
 const decimalToNumber = {
   to: (value?: number | null) => value,
@@ -62,6 +63,14 @@ export class Product {
 
   @Column({ type: 'jsonb', nullable: true })
   specifications: Record<string, string>;
+
+  /** Short bullet points shown as "Lo que tenés que saber de este producto". */
+  @Column({ type: 'jsonb', default: [] })
+  highlights: string[];
+
+  /** Grouped specification tables shown as "Características del producto". */
+  @Column({ type: 'jsonb', default: [] })
+  specGroups: SpecGroup[];
 
   @Column({ default: false, name: 'is_featured' })
   isFeatured: boolean;

@@ -111,9 +111,9 @@ onUnmounted(() => {
         </button>
 
         <!-- Logo -->
-        <NuxtLink to="/" class="flex shrink-0 items-center gap-3">
-          <img :src="logo" alt="TOROX" class="h-16 w-auto object-contain drop-shadow-[0_2px_8px_rgba(2,116,197,0.4)]" />
-          <span class="text-3xl font-black tracking-tight text-dark-800">
+        <NuxtLink to="/" class="flex shrink-0 items-center gap-2 sm:gap-3">
+          <img :src="logo" alt="TOROX" class="h-10 w-auto object-contain drop-shadow-[0_2px_8px_rgba(2,116,197,0.4)] sm:h-16" />
+          <span class="text-xl font-black tracking-tight text-dark-800 sm:text-3xl">
             TOROX<span class="text-brand-600">.</span>
           </span>
         </NuxtLink>
@@ -323,14 +323,6 @@ onUnmounted(() => {
     <!-- Second row -->
     <div class="hidden border-b border-slate-100 bg-slate-50/60 lg:block">
       <div class="container-torox flex h-11 items-center justify-between text-sm">
-        <NuxtLink
-          to="/cuenta/direcciones"
-          class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-700 transition hover:bg-slate-100"
-        >
-          <MapPin class="h-4 w-4 text-brand-600" />
-          <span class="font-medium">Enviar a</span>
-          <span class="text-slate-500">{{ location }}</span>
-        </NuxtLink>
         <nav class="flex items-center gap-1">
           <!-- Productos dropdown -->
           <div class="products-dropdown relative">
@@ -375,6 +367,14 @@ onUnmounted(() => {
             Preguntas frecuentes
           </NuxtLink>
         </nav>
+        <NuxtLink
+          to="/cuenta/direcciones"
+          class="ml-10 flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-700 transition hover:bg-slate-100"
+        >
+          <MapPin class="h-4 w-4 text-brand-600" />
+          <span class="font-medium">Enviar a</span>
+          <span class="text-slate-500">{{ location }}</span>
+        </NuxtLink>
       </div>
     </div>
 
