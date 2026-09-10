@@ -35,6 +35,16 @@ async function addToCart() {
   }
 }
 
+async function buyNow() {
+  if (!props.product.isInStock) return
+  try {
+    await cart.add(props.product.id, 1)
+    router.push('/checkout')
+  } catch (error: any) {
+    toast.error(error.message || 'No se pudo agregar al carrito')
+  }
+}
+
 async function toggleFavorite() {
   if (!auth.isAuthenticated) {
     router.push('/auth/login')
@@ -101,7 +111,7 @@ async function toggleFavorite() {
       <div class="mt-3 grid grid-cols-2 gap-2">
         <button
           class="rounded-lg py-2 text-sm font-semibold text-white transition hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-          :style="{ backgroundColor: '#3483FA' }" :disabled="!product.isInStock" @click="addToCart">
+          :style="{ backgroundColor: '#3483FA' }" :disabled="!product.isInStock" @click="buyNow">
           Comprar ahora
         </button>
         <button

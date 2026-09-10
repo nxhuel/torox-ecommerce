@@ -5,33 +5,18 @@ const faqs = [
   {
     question: '¿Qué calidad tienen los productos TOROX?',
     answer:
-      'Trabajamos únicamente con marcas líderes del mercado de seguridad electrónica. Cada producto pasa por controles de calidad y cuenta con garantía oficial de 12 meses. Ofrecemos asesoramiento personalizado para que elijas la solución que mejor se adapta a tu espacio.',
+      'Trabajamos únicamente con marcas líderes del mercado de seguridad electrónica. Cada producto pasa por controles de calidad y cuenta con garantía oficial de 30 días.',
   },
   {
     question: '¿Cómo funcionan los envíos?',
     answer:
-      'Despachamos tu pedido en 24 hs hábiles a todo el país. Una vez despachado, recibís un número de seguimiento para monitorear el envío en tiempo real desde tu cuenta. El envío es gratis en compras superiores a $150.000 y los plazos varían según tu ubicación (generalmente 1 a 5 días hábiles).',
+      'Despachamos tu pedido en 24 hs hábiles a todo el país. Una vez despachado, recibís un número de seguimiento para monitorear el envío en tiempo real desde tu cuenta. El costo del envío corre por cuenta del comprador y los plazos varían según tu ubicación.',
   },
   {
     question: '¿Qué medios de pago aceptan?',
     answer:
-      'Aceptamos tarjetas de crédito y débito de todos los bancos, con financiación de hasta 12 cuotas sin interés en productos seleccionados. También podés pagar por transferencia bancaria. Todos los pagos se procesan de forma segura y simulada en esta demo.',
-  },
-  {
-    question: '¿Ofrecen instalación y soporte técnico?',
-    answer:
-      'Sí. Contamos con técnicos especializados para la instalación de cámaras, alarmas y centrales. Además, nuestro equipo de soporte te acompaña por teléfono o chat antes y después de la compra para configurar tus equipos y resolver cualquier duda.',
-  },
-  {
-    question: '¿Qué pasa si el producto llega dañado o tiene una falla?',
-    answer:
-      'Si tu producto llega en mal estado o presenta fallas de fábrica, tenés garantía de 12 meses con cambio sin vueltas. Solo contactanos dentro de los primeros 30 días con el número de pedido y coordinamos el reemplazo o la reparación sin costo.',
-  },
-  {
-    question: '¿Cómo puedo hacer seguimiento de mi pedido?',
-    answer:
-      'Desde la sección "Mis compras" de tu cuenta podés ver el estado de cada pedido en tiempo real: pago aprobado, preparación, en tránsito y entregado. También te enviamos notificaciones automáticas en cada cambio de estado y podés consultar el tracking del correo con tu número de envío.',
-  },
+      'Aceptamos tarjetas de crédito y débito de todos los bancos. La posibilidad de financiación y las cuotas dependen de cada tarjeta; no ofrecemos cuotas sin interés. También podés pagar por transferencia bancaria.',
+  }
 ]
 
 const openIndex = ref<number | null>(0)

@@ -140,7 +140,7 @@ const shipmentProgress = computed(() => {
                   <Truck class="h-5 w-5 text-brand-600" /> Seguimiento del envío
                 </h2>
                 <span class="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-                  {{ order.shipment?.carrier || 'ANDREANI (SIMULADO)' }}
+                  {{ order.shipment?.carrier || 'LOGÍSTICA ANDREANI' }}
                 </span>
               </div>
 
@@ -256,7 +256,7 @@ const shipmentProgress = computed(() => {
                   <span>Descuento</span><span>-{{ currency(order.discount) }}</span>
                 </div>
                 <div class="flex justify-between text-slate-600">
-                  <span>Envío</span><span>{{ order.shippingCost === 0 ? 'Gratis' : currency(order.shippingCost) }}</span>
+                  <span>Envío</span><span>{{ order.shippingCost === 0 ? '$3.000 (PS).' : currency(order.shippingCost) }}</span>
                 </div>
                 <div class="flex justify-between border-t border-slate-100 pt-2 text-base font-bold text-slate-900">
                   <span>Total</span><span>{{ currency(order.total) }}</span>
@@ -276,10 +276,6 @@ const shipmentProgress = computed(() => {
               <p class="text-sm text-slate-600">
                 {{ order.shippingAddress.city }}, {{ order.shippingAddress.province }} (CP {{ order.shippingAddress.postalCode }})
               </p>
-              <div class="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-700">
-                <Shield class="h-4 w-4 shrink-0" />
-                Compra protegida por TOROX
-              </div>
             </div>
           </div>
         </div>

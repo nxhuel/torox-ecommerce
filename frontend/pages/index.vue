@@ -1,25 +1,13 @@
 <script setup lang="ts">
-import { ArrowRight, Percent, ChevronLeft, ChevronRight } from 'lucide-vue-next'
-import type { Category, Product } from '~/types'
-import { categoriesService, productsService } from '~/services'
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import type { Product } from '~/types'
+import { productsService } from '~/services'
 
-import iconHogar from '~/assets/icon-hogar.png'
-import iconEmpresa from '~/assets/icon-empresa.png'
-import iconMonitoreo from '~/assets/icon-monitoreo.png'
-import iconInstalacion from '~/assets/icon-instalacion.png'
 import heroSlide1 from '~/assets/fondo-hero-uno.png'
 import heroSlide2 from '~/assets/fondo-hero-dos.png'
 
-const categories = ref<Category[]>([])
 const featured = ref<Product[]>([])
 const loading = ref(true)
-const categoryPage = ref(0)
-const visibleCategories = computed(() => {
-  const perPage = 3
-  const start = categoryPage.value * perPage
-  return categories.value.slice(start, start + perPage)
-})
-const maxCategoryPage = computed(() => Math.max(0, Math.ceil(categories.value.length / 3) - 1))
 
 const heroSlides = [
   {
@@ -28,8 +16,8 @@ const heroSlides = [
     description: 'Soluciones avanzadas de seguridad para hogares y empresas. Cámaras, alarmas y tecnología diseñada para proteger tus espacios las 24 horas.',
     ctaText: 'Protegete',
     ctaLink: '/productos',
-    secondaryCtaText: 'Ver ofertas',
-    secondaryCta: '/productos?isOnSale=true',
+    secondaryCtaText: 'Ver productos',
+    secondaryCta: '/productos',
   },
   {
     image: heroSlide2,
@@ -69,47 +57,20 @@ function resetTimer() {
 
 onMounted(() => {
   resetTimer()
+  loadFeatured()
 })
 
 onUnmounted(() => {
   if (heroTimer) clearInterval(heroTimer)
 })
 
-const solutions = [
-  {
-    name: 'Hogares',
-    icon: iconHogar,
-    description: 'Cámaras, alarmas y sensores para cuidar a tu familia estés donde estés.',
-  },
-  {
-    name: 'Empresas',
-    icon: iconEmpresa,
-    description: 'Sistemas de CCTV y control de acceso para proteger tu negocio.',
-  },
-  {
-    name: 'Monitoreo',
-    icon: iconMonitoreo,
-    description: 'Vigilá en tiempo real desde el celular con visión remota.',
-  },
-  {
-    name: 'Instalación',
-    icon: iconInstalacion,
-    description: 'Asesoramiento y soporte técnico profesional en cada compra.',
-  },
-]
-
-onMounted(async () => {
+async function loadFeatured() {
   try {
-    const [cats, feat] = await Promise.all([
-      categoriesService.all(true),
-      productsService.featured(),
-    ])
-    categories.value = cats
-    featured.value = feat
+    featured.value = await productsService.featured()
   } finally {
     loading.value = false
   }
-})
+}
 </script>
 
 <template>
@@ -179,80 +140,15 @@ onMounted(async () => {
     </section>
 
     <!-- Benefits card -->
-    <div class="relative z-10 -mt-12 mb-4">
+    <div class="relative z-10 -mt-12 lg:-mt-14">
       <div class="container-torox">
         <StorefrontBenefits />
       </div>
     </div>
 
-    <!-- Categories -->
-    <section class="container-torox py-12 lg:py-16">
-      <div class="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
-        <!-- Left: Title + Description + Nav arrows -->
-        <div class="flex shrink-0 flex-col lg:w-64 lg:py-4">
-          <h2 class="text-2xl font-bold text-slate-900 sm:text-3xl">Categorías</h2>
-          <p class="mt-3 max-w-xs text-sm leading-relaxed text-slate-500">
-            Explorá nuestras categorías y encontrá las soluciones ideales para proteger tu hogar o negocio.
-          </p>
-          <div class="mt-6 flex items-center gap-3">
-            <button
-              aria-label="Anterior"
-              class="flex h-10 w-10 items-center justify-center rounded-full border-2 border-slate-900 text-slate-900 transition hover:bg-slate-900 hover:text-white disabled:opacity-30"
-              :disabled="categoryPage === 0"
-              @click="categoryPage--"
-            >
-              <ChevronLeft class="h-5 w-5" />
-            </button>
-            <button
-              aria-label="Siguiente"
-              class="flex h-10 w-10 items-center justify-center rounded-full border-2 border-slate-900 text-slate-900 transition hover:bg-slate-900 hover:text-white disabled:opacity-30"
-              :disabled="categoryPage >= maxCategoryPage"
-              @click="categoryPage++"
-            >
-              <ChevronRight class="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-
-        <!-- Right: Category cards -->
-        <div v-if="loading" class="flex flex-1 gap-4 overflow-hidden">
-          <BaseSkeleton v-for="i in 3" :key="i" class="h-60 w-48 shrink-0 !rounded-2xl sm:h-72 sm:w-64" />
-        </div>
-        <div v-else class="flex flex-1 gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth sm:gap-4 sm:overflow-hidden">
-          <NuxtLink
-            v-for="category in visibleCategories"
-            :key="category.id"
-            :to="`/productos?categoryId=${category.id}`"
-            class="group flex w-48 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover sm:w-64"
-          >
-            <div class="relative aspect-[4/3] overflow-hidden bg-slate-50">
-              <AppImage
-                :src="category.imageUrl"
-                :alt="category.name"
-                :seed="category.slug"
-                class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-              />
-            </div>
-            <div class="flex flex-1 flex-col p-4">
-              <span class="text-sm font-bold text-slate-900">{{ category.name }}</span>
-              <span
-                v-if="category.description"
-                class="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500"
-              >
-                {{ category.description }}
-              </span>
-              <span class="mt-auto pt-3 text-xs font-bold text-brand-600">
-                {{ category.productCount ?? 0 }} productos
-              </span>
-            </div>
-          </NuxtLink>
-        </div>
-      </div>
-    </section>
-
     <!-- Featured -->
-    <section class="bg-slate-100 py-12 lg:py-16 dark:bg-dark-900">
-      <div class="container-torox">
+    <section class="-mt-12 bg-slate-100 pt-12 pb-12 dark:bg-dark-900 lg:-mt-14 lg:pt-14 lg:pb-16">
+      <div class="container-torox pt-8">
         <div class="mb-8 flex items-end justify-between">
           <div>
             <h2 class="text-2xl font-bold text-slate-900 sm:text-3xl dark:text-white">Productos destacados</h2>
@@ -270,27 +166,6 @@ onMounted(async () => {
         </div>
       </div>
     </section>
-
-    <!-- Solutions -->
-    <!-- <section class="bg-dark-800 py-12 lg:py-16">
-      <div class="container-torox">
-        <div class="mx-auto mb-10 max-w-2xl text-center">
-          <h2 class="text-2xl font-bold text-white sm:text-3xl">Soluciones para cada espacio</h2>
-          <p class="mt-2 text-slate-400">Diseñamos la protección que tu hogar o negocio necesita</p>
-        </div>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div
-            v-for="solution in solutions"
-            :key="solution.name"
-            class="rounded-xl border border-white/10 bg-white/5 p-6 transition-transform duration-300 hover:scale-[1.03]"
-          >
-            <img :src="solution.icon" :alt="solution.name" class="h-14 w-14 object-contain" />
-            <h3 class="mt-4 text-lg font-bold text-white">{{ solution.name }}</h3>
-            <p class="mt-1.5 text-sm text-slate-400">{{ solution.description }}</p>
-          </div>
-        </div>
-      </div>
-    </section> -->
 
     <!-- Testimonials -->
     <StorefrontTestimonials />
@@ -312,16 +187,5 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-/* Hide scrollbar on mobile category carousel */
-@media (max-width: 639px) {
-  .snap-x::-webkit-scrollbar {
-    display: none;
-  }
-  .snap-x {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
 }
 </style>

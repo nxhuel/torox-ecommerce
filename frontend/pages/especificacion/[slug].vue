@@ -202,9 +202,6 @@ function isVideo(url: string) {
             <p v-if="discount" class="mt-1 text-sm text-green-600 dark:text-green-400">
               Ahorrás {{ currency((product.originalPrice || 0) - product.finalPrice) }}
             </p>
-            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">En 6 cuotas de {{ currency(product.finalPrice /
-              6) }} sin
-              interés</p>
 
             <div class="mt-5 flex items-center gap-4">
               <QuantitySelector v-model="quantity" :max="Math.max(1, product.stock)" />
@@ -257,12 +254,11 @@ function isVideo(url: string) {
             </button>
           </div>
 
-          <div class="mt-5 grid gap-3 sm:grid-cols-2">
+          <!-- <div class="mt-5 grid gap-3 sm:grid-cols-2">
             <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card dark:bg-dark-800">
               <Truck class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" />
               <div>
                 <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">Envío simulado por Andreani</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Gratis en compras superiores a $50.000</p>
               </div>
             </div>
             <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card dark:bg-dark-800">
@@ -275,7 +271,7 @@ function isVideo(url: string) {
             <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card dark:bg-dark-800">
               <ShieldCheck class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" />
               <div>
-                <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">Garantía de 12 meses</p>
+                <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">Garantía de 30 días</p>
                 <p class="text-xs text-slate-500 dark:text-slate-400">Cubierta por el fabricante</p>
               </div>
             </div>
@@ -286,7 +282,7 @@ function isVideo(url: string) {
                 <p class="text-xs text-slate-500 dark:text-slate-400">30 días para devoluciones</p>
               </div>
             </div>
-          </div>
+          </div> -->
         </div>
       </div>
 

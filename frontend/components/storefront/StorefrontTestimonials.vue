@@ -4,10 +4,10 @@ import { ThumbsUp, Star, ChevronLeft, ChevronRight, CalendarDays, Check } from '
 const testimonials = [
   {
     name: 'Martina López',
-    location: 'Hogar · Villa Urquiza',
+    location: 'Casa · Villa Urquiza',
     initials: 'ML',
     color: 'bg-gradient-to-br from-brand-500 to-brand-700',
-    text: 'Compré un kit de cámaras WiFi y la instalación fue rapidísima. La calidad de imagen de noche es increíble, y desde el celular veo todo en tiempo real. ¡Súper recomendables!',
+    text: 'Compré la cámara para mi bebé y la calidad de imagen es muy buena. La envíaron rápido y llegó en perfecto estado.',
     date: '12 de marzo de 2026',
   },
   {
@@ -15,31 +15,15 @@ const testimonials = [
     location: 'Empresa · Microcentro',
     initials: 'GP',
     color: 'bg-gradient-to-br from-emerald-500 to-emerald-700',
-    text: 'Equipamos nuestras dos sucursales con CCTV y control de acceso. El asesoramiento previo fue excelente y el monitoreo funciona a la perfección. Muy profesionales.',
+    text: 'Equipamos nuestras dos sucursales con cámaras. Todo llegó completo y el monitoreo funciona a la perfección. Muy conformes.',
     date: '28 de febrero de 2026',
-  },
-  {
-    name: 'Carolina Fernández',
-    location: 'Hogar · Palermo',
-    initials: 'CF',
-    color: 'bg-gradient-to-br from-amber-500 to-orange-600',
-    text: 'El videoportero llegó antes de lo esperado y en perfecto estado. La app es sencillísima de usar y la atención postventa fue de otro nivel. Volvería a comprar sin dudar.',
-    date: '15 de febrero de 2026',
-  },
-  {
-    name: 'Diego Ramírez',
-    location: 'Empresa · Zona Norte',
-    initials: 'DR',
-    color: 'bg-gradient-to-br from-violet-500 to-purple-700',
-    text: 'Instalaron la central de alarmas en mi depósito. Respuesta inmediata ante cualquier evento y el equipo técnico siempre disponible. La mejor inversión en seguridad que hice.',
-    date: '3 de febrero de 2026',
   },
   {
     name: 'Sofía Aguirre',
     location: 'Hogar · Belgrano',
     initials: 'SA',
     color: 'bg-gradient-to-br from-rose-500 to-pink-700',
-    text: 'Excelente atención de principio a fin. Me asesoraron para elegir los sensores correctos para mi casa y la instalación quedó impecable. Se nota que saben lo que venden.',
+    text: 'Me compré una cerradura inteligente con huella y es un cambio total. La calidad del producto es primera y el envío fue puntual. Se nota que trabajan con buenas marcas.',
     date: '21 de enero de 2026',
   },
   {
@@ -47,7 +31,7 @@ const testimonials = [
     location: 'Empresa · Avellaneda',
     initials: 'JS',
     color: 'bg-gradient-to-br from-cyan-500 to-sky-700',
-    text: 'Compré las cámaras para el local y el seguimiento del pedido fue transparente. Todo llegó perfecto, con garantía y a un precio muy competitivo. Muy conforme.',
+    text: 'Compré las cámaras para el local y el seguimiento del pedido fue transparente. Todo llegó perfecto. Muy conforme.',
     date: '9 de enero de 2026',
   },
 ]
@@ -72,7 +56,7 @@ function scrollByCard(direction: 1 | -1) {
           Opiniones verificadas
         </span>
         <h2 class="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">Lo que opinan nuestros clientes</h2>
-        <p class="mt-2 text-slate-500">Más de 2.000 familias y empresas ya confían en TOROX</p>
+        <p class="mt-2 text-slate-500">Familias y empresas ya confían en TOROX</p>
       </div>
 
       <div class="relative">
@@ -143,21 +127,26 @@ function scrollByCard(direction: 1 | -1) {
           </div>
         </div>
 
-        <!-- Arrows -->
-        <button
-          class="absolute -left-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white text-slate-700 shadow-card transition hover:bg-brand-600 hover:text-white lg:flex"
-          aria-label="Anteriores"
-          @click="scrollByCard(-1)"
+        <!-- Arrows (solo desktop: abajo, fuera del track para no tapar contenido) -->
+        <div
+          class="absolute pt-8 gap-4 left-1/2 top-full -translate-x-1/2 -translate-y-2 flex lg:flex"
         >
-          <ChevronLeft class="h-5 w-5" />
-        </button>
-        <button
-          class="absolute -right-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white text-slate-700 shadow-card transition hover:bg-brand-600 hover:text-white lg:flex"
-          aria-label="Siguientes"
-          @click="scrollByCard(1)"
-        >
-          <ChevronRight class="h-5 w-5" />
-        </button>
+          <button
+            class="hidden h-11 w-11 -translate-y-3 items-center justify-center rounded-full bg-white text-slate-700 shadow-card transition hover:bg-brand-600 hover:text-white lg:flex"
+            aria-label="Anterior"
+            @click="scrollByCard(-1)"
+          >
+            <ChevronLeft class="h-5 w-5" />
+          </button>
+          <div class="h-11 w-px bg-slate-200 hidden lg:block" />
+          <button
+            class="hidden h-11 w-11 -translate-y-3 items-center justify-center rounded-full bg-white text-slate-700 shadow-card transition hover:bg-brand-600 hover:text-white lg:flex"
+            aria-label="Siguiente"
+            @click="scrollByCard(1)"
+          >
+            <ChevronRight class="h-5 w-5" />
+          </button>
+        </div>
       </div>
     </div>
   </section>

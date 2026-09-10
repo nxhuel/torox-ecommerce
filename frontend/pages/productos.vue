@@ -198,10 +198,6 @@ const activeCategory = computed(() =>
               Solo disponibles
             </label>
             <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
-              <input v-model="isOnSale" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500" @change="applyFilters" />
-              Solo en oferta
-            </label>
-            <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
               <input v-model="isFeatured" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" @change="applyFilters" />
               Destacados
             </label>
@@ -309,10 +305,6 @@ const activeCategory = computed(() =>
         <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
           <input v-model="inStock" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-brand-600" @change="applyFilters" />
           Solo disponibles
-        </label>
-        <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
-          <input v-model="isOnSale" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-red-600" @change="applyFilters" />
-          Solo en oferta
         </label>
         <div class="flex gap-3">
           <button class="btn-secondary flex-1" @click="clearFilters; mobileFilters = false">Limpiar</button>

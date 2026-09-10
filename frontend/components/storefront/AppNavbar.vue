@@ -19,9 +19,7 @@ import {
 import { useAuthStore } from '~/stores/auth'
 import { useCartStore } from '~/stores/cart'
 import { useNotificationsStore } from '~/stores/notifications'
-import { categoriesService } from '~/services'
 import logo from '~/assets/logo.png'
-import type { Category } from '~/types'
 import { useTheme } from '~/composables/useTheme'
 
 const router = useRouter()
@@ -37,26 +35,16 @@ const accountOpen = ref(false)
 const notifOpen = ref(false)
 const notifMenuRef = ref<HTMLElement | null>(null)
 const location = ref('Buenos Aires')
-const isProductsOpen = ref(false)
-const topCategories = ref<Category[]>([])
-
-onMounted(async () => {
+onMounted(() => {
   auth.init()
   cart.init()
   if (auth.isAuthenticated) notifications.load()
   document.addEventListener('click', onClickOutside)
-  try {
-    topCategories.value = (await categoriesService.all(true)).filter((c: Category) => !c.parentId).slice(0, 6)
-  } catch {}
 })
 
 function onClickOutside(event: MouseEvent) {
   if (notifMenuRef.value && !notifMenuRef.value.contains(event.target as Node)) {
     notifOpen.value = false
-  }
-  const productsMenu = event.target as HTMLElement
-  if (!productsMenu.closest('.products-dropdown')) {
-    isProductsOpen.value = false
   }
 }
 
@@ -324,44 +312,9 @@ onUnmounted(() => {
     <div class="hidden border-b border-slate-100 bg-slate-50/60 lg:block">
       <div class="container-torox flex h-11 items-center justify-between text-sm">
         <nav class="flex items-center gap-1">
-          <!-- Productos dropdown -->
-          <div class="products-dropdown relative">
-            <button
-              class="rounded-lg px-3 py-1.5 font-medium text-slate-700 transition hover:bg-slate-100 hover:text-brand-700"
-              @click="isProductsOpen = !isProductsOpen"
-            >
-              Productos
-              <ChevronDown class="ml-2 inline h-3.5 w-3.5 text-slate-400 transition-transform duration-150" :class="isProductsOpen ? 'rotate-180' : ''" />
-            </button>
-            <Transition name="dropdown">
-              <div
-                v-if="isProductsOpen"
-                class="absolute left-0 top-full mt-2 w-[260px] rounded-xl border border-slate-200 bg-white py-2 shadow-lg"
-              >
-                <p class="px-4 pt-2 text-xs font-bold uppercase tracking-wider text-slate-400">Categorías</p>
-                <NuxtLink
-                  v-for="cat in topCategories"
-                  :key="cat.id"
-                  :to="`/productos?categoryId=${cat.id}`"
-                  class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
-                  @click="isProductsOpen = false"
-                >
-                  <span v-if="cat.productCount != null" class="shrink-0 text-xs font-semibold text-brand-600">
-                    {{ cat.productCount }}
-                  </span>
-                  <span class="truncate">{{ cat.name }}</span>
-                </NuxtLink>
-                <div class="border-t border-slate-100 my-1" />
-                <NuxtLink
-                  to="/productos"
-                  class="flex items-center gap-2 px-4 py-2 text-sm text-brand-700 font-semibold transition hover:bg-brand-50"
-                  @click="isProductsOpen = false"
-                >
-                  Ver todos los productos
-                </NuxtLink>
-              </div>
-            </Transition>
-          </div>
+          <NuxtLink to="/productos" class="rounded-lg px-3 py-1.5 font-medium text-slate-700 transition hover:bg-slate-100 hover:text-brand-700">
+            Productos
+          </NuxtLink>
 
           <NuxtLink to="/faq" class="rounded-lg px-3 py-1.5 font-medium text-slate-700 transition hover:bg-slate-100 hover:text-brand-700">
             Preguntas frecuentes

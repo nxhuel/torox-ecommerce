@@ -96,7 +96,7 @@ function productImage(item: any) {
             <div class="flex justify-between text-slate-600">
               <span>Envío</span>
               <span class="font-semibold" :class="cart.cart.shippingCost === 0 ? 'text-emerald-600' : 'text-slate-900'">
-                {{ cart.cart.shippingCost === 0 ? 'Gratis' : currency(cart.cart.shippingCost) }}
+                {{ cart.cart.shippingCost === 0 ? '$3.000 (PS)' : currency(cart.cart.shippingCost) }}
               </span>
             </div>
             <div class="border-t border-slate-100 pt-3">
@@ -107,12 +107,12 @@ function productImage(item: any) {
             </div>
           </div>
 
-          <div v-if="cart.cart.subtotal < cart.cart.freeShippingThreshold" class="mt-4 flex items-start gap-2 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
+          <!-- <div v-if="cart.cart.subtotal < cart.cart.freeShippingThreshold" class="mt-4 flex items-start gap-2 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
             <Truck class="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               Te faltan {{ currency(cart.cart.freeShippingThreshold - cart.cart.subtotal) }} para envío gratis
             </span>
-          </div>
+          </div> -->
 
           <button class="btn-primary mt-5 w-full !py-3" @click="router.push('/checkout')">
             Continuar compra <ArrowRight class="h-4 w-4" />

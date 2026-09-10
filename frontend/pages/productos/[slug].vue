@@ -195,7 +195,7 @@ function isVideo(url: string) {
               :class="product.isInStock ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'">
               {{ product.isInStock ? `Stock disponible: ${product.stock}` : 'Agotado' }}
             </span>
-            <span v-if="product.salesCount > 0" class="text-slate-400">{{ product.salesCount }} vendidos</span>
+            <!-- <span v-if="product.salesCount > 0" class="text-slate-400">{{ product.salesCount }} vendidos</span> -->
           </div>
 
           <div class="mt-5 rounded-xl border border-slate-200 bg-white p-5">
@@ -203,8 +203,6 @@ function isVideo(url: string) {
             <p v-if="discount" class="mt-1 text-sm text-red-600">
               Ahorrás {{ currency((product.originalPrice || 0) - product.finalPrice) }}
             </p>
-            <p class="mt-2 text-xs text-slate-500">En 6 cuotas de {{ currency(product.finalPrice / 6) }} sin interés</p>
-
             <div class="mt-5 flex items-center gap-4">
               <QuantitySelector v-model="quantity" :max="Math.max(1, product.stock)" />
               <button class="btn-primary flex-1 !py-3" :disabled="!product.isInStock" @click="addToCart">
@@ -242,36 +240,6 @@ function isVideo(url: string) {
             </button>
           </div>
 
-          <div class="mt-5 grid gap-3 sm:grid-cols-2">
-            <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card">
-              <Truck class="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
-              <div>
-                <p class="text-sm font-semibold text-slate-800">Envío simulado por Andreani</p>
-                <p class="text-xs text-slate-500">Gratis en compras superiores a $50.000</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card">
-              <CreditCard class="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
-              <div>
-                <p class="text-sm font-semibold text-slate-800">Pago simulado</p>
-                <p class="text-xs text-slate-500">Tarjetas y transferencia</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card">
-              <ShieldCheck class="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
-              <div>
-                <p class="text-sm font-semibold text-slate-800">Garantía de 12 meses</p>
-                <p class="text-xs text-slate-500">Cubierta por el fabricante</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card">
-              <RefreshCw class="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
-              <div>
-                <p class="text-sm font-semibold text-slate-800">Cambio fácil</p>
-                <p class="text-xs text-slate-500">30 días para devoluciones</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 

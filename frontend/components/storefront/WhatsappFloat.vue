@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const WHATSAPP_NUMBER = '5491133414517'
+const WHATSAPP_NUMBER = '5491171383512'
 
 function openWhatsApp() {
   window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hola!%20Quisiera%20saber%20m%C3%A1s%20informaci%C3%B3n%20sobre%20sus%20productos.`, '_blank', 'noopener,noreferrer')

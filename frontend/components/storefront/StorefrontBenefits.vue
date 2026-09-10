@@ -23,7 +23,7 @@ const benefits = [
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-6 rounded-2xl bg-white px-6 py-6 shadow-card sm:px-10 md:grid-cols-3 md:gap-8">
+  <div class="grid grid-cols-1 gap-6 rounded-2xl bg-dark-900 px-6 py-6 shadow-lg sm:px-10 md:grid-cols-3 md:gap-8">
     <div
       v-for="benefit in benefits"
       :key="benefit.title"
@@ -33,8 +33,8 @@ const benefits = [
         <img :src="benefit.icon" :alt="benefit.title" class="h-12 w-12 object-contain" />
       </div>
       <div class="min-w-0">
-        <p class="font-bold text-slate-900">{{ benefit.title }}</p>
-        <p class="text-sm text-slate-500">{{ benefit.subtitle }}</p>
+        <p class="font-bold text-white">{{ benefit.title }}</p>
+        <p class="text-sm text-slate-400">{{ benefit.subtitle }}</p>
       </div>
     </div>
   </div>

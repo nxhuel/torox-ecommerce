@@ -236,31 +236,23 @@ async function placeOrder() {
     <ol class="mb-10 flex items-center gap-0">
       <li v-for="(s, index) in steps" :key="s.number" class="flex flex-1 items-center last:flex-none">
         <div class="flex flex-col items-center gap-1.5 sm:flex-row sm:gap-2.5">
-          <span
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition"
-            :class="
-              step > s.number
-                ? 'bg-emerald-500 text-white'
-                : step === s.number
-                  ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30'
-                  : 'bg-slate-200 text-slate-500'
-            "
-          >
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition"
+            :class="step > s.number
+              ? 'bg-emerald-500 text-white'
+              : step === s.number
+                ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30'
+                : 'bg-slate-200 text-slate-500'
+              ">
             <Check v-if="step > s.number" class="h-4 w-4" />
             <span v-else>{{ s.number }}</span>
           </span>
-          <span
-            class="hidden text-sm font-semibold sm:block"
-            :class="step >= s.number ? 'text-slate-900' : 'text-slate-400'"
-          >
+          <span class="hidden text-sm font-semibold sm:block"
+            :class="step >= s.number ? 'text-slate-900' : 'text-slate-400'">
             {{ s.label }}
           </span>
         </div>
-        <div
-          v-if="index < steps.length - 1"
-          class="mx-3 h-0.5 flex-1 rounded"
-          :class="step > s.number ? 'bg-emerald-500' : 'bg-slate-200'"
-        />
+        <div v-if="index < steps.length - 1" class="mx-3 h-0.5 flex-1 rounded"
+          :class="step > s.number ? 'bg-emerald-500' : 'bg-slate-200'" />
       </li>
     </ol>
 
@@ -280,15 +272,18 @@ async function placeOrder() {
             </div>
             <div>
               <label class="label-base" for="customerEmail">Email *</label>
-              <input id="customerEmail" v-model="form.customerEmail" type="email" class="input-base" placeholder="juan@email.com" />
+              <input id="customerEmail" v-model="form.customerEmail" type="email" class="input-base"
+                placeholder="juan@email.com" />
             </div>
             <div>
               <label class="label-base" for="customerPhone">Teléfono *</label>
-              <input id="customerPhone" v-model="form.customerPhone" class="input-base" placeholder="+54 11 5555-1234" />
+              <input id="customerPhone" v-model="form.customerPhone" class="input-base"
+                placeholder="+54 11 5555-1234" />
             </div>
           </div>
 
-          <div v-if="!auth.isAuthenticated" class="mt-5 rounded-lg border border-brand-100 bg-brand-50 p-4 text-sm text-brand-800">
+          <div v-if="!auth.isAuthenticated"
+            class="mt-5 rounded-lg border border-brand-100 bg-brand-50 p-4 text-sm text-brand-800">
             <p>
               <strong>¿Ya tenés una cuenta?</strong>
               <NuxtLink to="/auth/login" class="font-bold underline">Ingresá</NuxtLink>
@@ -331,7 +326,8 @@ async function placeOrder() {
             </div>
             <div>
               <label class="label-base" for="references">Referencias</label>
-              <input id="references" v-model="form.references" class="input-base" placeholder="Casa con reja negra (opcional)" />
+              <input id="references" v-model="form.references" class="input-base"
+                placeholder="Casa con reja negra (opcional)" />
             </div>
           </div>
         </div>
@@ -339,42 +335,22 @@ async function placeOrder() {
         <!-- Step 3: Shipping method -->
         <div v-if="step === 3" class="card animate-fade-in-up p-6">
           <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            <Truck class="h-4 w-4" /> Envío simulado por Andreani
+            <Truck class="h-4 w-4" /> Envío por <a href='https://www.andreani.com/' target="_blank"
+              class="underline ">Andreani</a>
           </div>
           <h2 class="mb-5 text-lg font-bold text-slate-900">Método de envío</h2>
           <div class="space-y-3">
-            <label
-              class="flex cursor-pointer items-start gap-4 rounded-xl border-2 p-4 transition"
-              :class="form.shippingMethod === 'HOME_DELIVERY' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'"
-            >
-              <input v-model="form.shippingMethod" type="radio" value="HOME_DELIVERY" class="mt-1 h-4 w-4 text-brand-600" />
+            <label class="flex cursor-pointer items-start gap-4 rounded-xl border-2 p-4 transition"
+              :class="form.shippingMethod === 'HOME_DELIVERY' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'">
+              <input v-model="form.shippingMethod" type="radio" value="HOME_DELIVERY"
+                class="mt-1 h-4 w-4 text-brand-600" />
               <span class="flex-1">
                 <span class="flex items-center gap-2 font-semibold text-slate-800">
                   <Home class="h-4 w-4 text-brand-600" /> Envío a domicilio
                 </span>
-                <span class="mt-1 block text-sm text-slate-500">Entrega estimada: 3 a 5 días hábiles</span>
-                <span class="mt-1 block text-sm font-bold" :class="shippingCost === 0 ? 'text-emerald-600' : 'text-slate-800'">
-                  {{ shippingCost === 0 ? 'Gratis' : currency(shippingCost) }}
-                </span>
-              </span>
-            </label>
-            <label
-              class="flex cursor-pointer items-start gap-4 rounded-xl border-2 p-4 transition"
-              :class="form.shippingMethod === 'PICKUP' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'"
-            >
-              <input v-model="form.shippingMethod" type="radio" value="PICKUP" class="mt-1 h-4 w-4 text-brand-600" />
-              <span class="flex-1">
-                <span class="flex items-center gap-2 font-semibold text-slate-800">
-                  <Building class="h-4 w-4 text-brand-600" /> Retiro en sucursal
-                </span>
-                <span class="mt-1 block text-sm text-slate-500">Retirá gratis en sucursal Andreani de tu ciudad</span>
-                <span class="mt-1 block text-sm font-bold text-emerald-600">Gratis</span>
               </span>
             </label>
           </div>
-          <p v-if="freeShipping" class="mt-4 rounded-lg bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700">
-            🎉 ¡Envío gratis por superar los {{ currency(cart.cart?.freeShippingThreshold || 50000) }}!
-          </p>
         </div>
 
         <!-- Step 4: Payment -->
@@ -385,24 +361,18 @@ async function placeOrder() {
           <h2 class="mb-5 text-lg font-bold text-slate-900">Método de pago</h2>
 
           <div class="grid gap-3 sm:grid-cols-3">
-            <label
-              class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition"
-              :class="form.paymentMethod === 'CREDIT_CARD' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'"
-            >
+            <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition"
+              :class="form.paymentMethod === 'CREDIT_CARD' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'">
               <input v-model="form.paymentMethod" type="radio" value="CREDIT_CARD" class="h-4 w-4 text-brand-600" />
               <span class="text-sm font-semibold text-slate-800">Tarjeta de crédito</span>
             </label>
-            <label
-              class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition"
-              :class="form.paymentMethod === 'DEBIT_CARD' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'"
-            >
+            <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition"
+              :class="form.paymentMethod === 'DEBIT_CARD' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'">
               <input v-model="form.paymentMethod" type="radio" value="DEBIT_CARD" class="h-4 w-4 text-brand-600" />
               <span class="text-sm font-semibold text-slate-800">Tarjeta de débito</span>
             </label>
-            <label
-              class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition"
-              :class="form.paymentMethod === 'BANK_TRANSFER' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'"
-            >
+            <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition"
+              :class="form.paymentMethod === 'BANK_TRANSFER' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'">
               <input v-model="form.paymentMethod" type="radio" value="BANK_TRANSFER" class="h-4 w-4 text-brand-600" />
               <span class="text-sm font-semibold text-slate-800">Transferencia</span>
             </label>
@@ -413,19 +383,11 @@ async function placeOrder() {
               <div class="sm:col-span-2">
                 <label class="label-base" for="cardNumber">Número de tarjeta *</label>
                 <div class="relative">
-                  <input
-                    id="cardNumber"
-                    v-model="form.cardNumber"
-                    class="input-base !pr-24 font-mono"
-                    placeholder="1234 5678 9012 3456"
-                    inputmode="numeric"
-                    @input="formatCardNumber"
-                  />
-                  <span
-                    v-if="cardBrand"
+                  <input id="cardNumber" v-model="form.cardNumber" class="input-base !pr-24 font-mono"
+                    placeholder="1234 5678 9012 3456" inputmode="numeric" @input="formatCardNumber" />
+                  <span v-if="cardBrand"
                     class="absolute right-3 top-1/2 -translate-y-1/2 rounded px-2 py-0.5 text-[10px] font-black text-white"
-                    :class="cardBrand.color"
-                  >
+                    :class="cardBrand.color">
                     {{ cardBrand.short }}
                   </span>
                 </div>
@@ -433,15 +395,18 @@ async function placeOrder() {
               </div>
               <div class="sm:col-span-2">
                 <label class="label-base" for="cardHolder">Titular de la tarjeta *</label>
-                <input id="cardHolder" v-model="form.cardHolder" class="input-base" placeholder="Como figura en la tarjeta" />
+                <input id="cardHolder" v-model="form.cardHolder" class="input-base"
+                  placeholder="Como figura en la tarjeta" />
               </div>
               <div>
                 <label class="label-base" for="cardExpiry">Vencimiento *</label>
-                <input id="cardExpiry" v-model="form.cardExpiry" class="input-base font-mono" placeholder="MM/AA" inputmode="numeric" @input="formatExpiry" />
+                <input id="cardExpiry" v-model="form.cardExpiry" class="input-base font-mono" placeholder="MM/AA"
+                  inputmode="numeric" @input="formatExpiry" />
               </div>
               <div>
                 <label class="label-base" for="cardCvc">Código de seguridad *</label>
-                <input id="cardCvc" v-model="form.cardCvc" class="input-base font-mono" placeholder="123" inputmode="numeric" maxlength="4" />
+                <input id="cardCvc" v-model="form.cardCvc" class="input-base font-mono" placeholder="123"
+                  inputmode="numeric" maxlength="4" />
               </div>
             </div>
 
@@ -452,7 +417,8 @@ async function placeOrder() {
                 <li>Tarjeta con <strong>9999</strong> → pago rechazado</li>
                 <li>Cualquier otra → pago pendiente de confirmación</li>
               </ul>
-              <p class="mt-1">No se almacenan datos reales de tarjetas. Probá con <strong>4000 0000 0000 0002</strong>.</p>
+              <p class="mt-1">No se almacenan datos reales de tarjetas. Probá con <strong>4000 0000 0000 0002</strong>.
+              </p>
             </div>
           </template>
 
@@ -464,7 +430,8 @@ async function placeOrder() {
                   <p class="font-semibold text-slate-800">Transferencia bancaria simulada</p>
                   <p class="mt-1 text-sm text-slate-600">
                     Al confirmar, te mostraremos los datos de la cuenta para realizar la transferencia.
-                    El pedido quedará <strong>pendiente de confirmación</strong> hasta que el administrador apruebe el pago.
+                    El pedido quedará <strong>pendiente de confirmación</strong> hasta que el administrador apruebe el
+                    pago.
                   </p>
                 </div>
               </div>
@@ -479,8 +446,7 @@ async function placeOrder() {
           <button class="btn-primary !px-8 !py-3" :disabled="processing" @click="next">
             <Loader2 v-if="processing" class="h-4 w-4 animate-spin" />
             <template v-else>
-              {{ step < 4 ? 'Continuar' : 'Confirmar pago' }}
-            </template>
+              {{ step < 4 ? 'Continuar' : 'Confirmar pago' }} </template>
           </button>
         </div>
       </div>
@@ -491,8 +457,10 @@ async function placeOrder() {
         <div class="mt-4 max-h-72 space-y-3 overflow-y-auto pr-1">
           <div v-for="item in cart.cart?.items" :key="item.id" class="flex items-center gap-3">
             <div class="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-slate-100">
-              <AppImage :src="item.productSnapshot?.image" :alt="item.productSnapshot?.name || ''" :seed="item.productId" class="h-full w-full" />
-              <span class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-dark-800 px-1 text-[10px] font-bold text-white">
+              <AppImage :src="item.productSnapshot?.image" :alt="item.productSnapshot?.name || ''"
+                :seed="item.productId" class="h-full w-full" />
+              <span
+                class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-dark-800 px-1 text-[10px] font-bold text-white">
                 {{ item.quantity }}
               </span>
             </div>
@@ -514,17 +482,13 @@ async function placeOrder() {
           <div class="flex justify-between text-slate-600">
             <span>Envío</span>
             <span class="font-semibold" :class="shippingCost === 0 ? 'text-emerald-600' : 'text-slate-900'">
-              {{ shippingCost === 0 ? 'Gratis' : currency(shippingCost) }}
+              {{ shippingCost === 0 ? '$3.000 (PS)' : currency(shippingCost) }}
             </span>
           </div>
           <div class="flex justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
             <span>Total</span>
             <span>{{ currency(total) }}</span>
           </div>
-        </div>
-        <div class="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-          <Shield class="h-4 w-4 shrink-0 text-emerald-600" />
-          Compra 100% protegida. Pago procesado de forma simulada.
         </div>
       </aside>
     </div>
