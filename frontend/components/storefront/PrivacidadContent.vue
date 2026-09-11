@@ -2,7 +2,20 @@
   <div class="prose prose-sm prose-slate max-w-none">
     <p class="text-xs text-slate-400">Última actualización: septiembre 2026</p>
 
-    <h3 class="pt-2">1. Marco Legal</h3>
+    <h3 class="pt-2">1. Responsable del tratamiento</h3>
+    <p>
+      <strong>TOROX Seguridad</strong>
+      <br>
+      * Razón social: SARZI WALTER FABIAN
+      <br>
+      * CUIT: 20-21438911-9
+      <br>
+      * Domicilio: Madariaga 581, Lanús, Buenos Aires, CP 1824
+      <br>
+      * Correo electrónico: toroxseguridad@gmail.com
+    </p>
+
+    <h3 class="pt-2">2. Marco Legal</h3>
     <p>
       La presente Política de Privacidad se elabora en cumplimiento de la
       <strong>Ley N.º 25.326 de Protección de Datos Personales</strong> (Ley de Habeas Data), su
@@ -11,7 +24,7 @@
       encargado de velar por el cumplimiento de dicha normativa.
     </p>
 
-    <h3 class="pt-2">2. Finalidad del Tratamiento</h3>
+    <h3 class="pt-2">3. Finalidad del Tratamiento</h3>
     <p>Los datos personales serán utilizados para:</p>
     <ul>
       <li>Gestionar pedidos, envíos y facturación</li>
@@ -22,7 +35,7 @@
       <li>Prevenir fraudes y garantizar la seguridad de la plataforma</li>
     </ul>
 
-    <h3 class="pt-2">3. Consentimiento</h3>
+    <h3 class="pt-2">4. Consentimiento</h3>
     <p>
       Al proporcionar sus datos personales y crear una cuenta, el usuario otorga su
       <strong>consentimiento libre, previo, informado y expreso</strong> para el tratamiento de
@@ -30,7 +43,7 @@
       comerciales será siempre opt-in (el usuario debe aceptar expresamente).
     </p>
 
-    <h3 class="pt-2">4. Conservación de los Datos</h3>
+    <h3 class="pt-2">5. Conservación de los Datos</h3>
     <p>
       Los datos personales se conservarán mientras la cuenta del usuario permanezca activa o
       durante el plazo necesario para cumplir con las obligaciones legales. Los datos de
@@ -38,7 +51,7 @@
       tributaria argentina (AFIP).
     </p>
 
-    <h3 class="pt-2">5. Seguridad de los Datos</h3>
+    <h3 class="pt-2">6. Seguridad de los Datos</h3>
     <p>
       Implementamos medidas de seguridad técnicas y organizativas para proteger los datos contra
       acceso no autorizado, alteración, divulgación o destrucción, incluyendo:
@@ -49,7 +62,7 @@
       <li>Monitoreo periódico de seguridad</li>
     </ul>
 
-    <h3 class="pt-2">6. Compartición de Datos</h3>
+    <h3 class="pt-2">7. Compartición de Datos</h3>
     <p>
       Los datos personales podrán ser compartidos con:
     </p>
@@ -63,7 +76,7 @@
       En ningún caso se venderán datos personales a terceros para fines comerciales.
     </p>
 
-    <h3 class="pt-2">7. Derechos del Titular</h3>
+    <h3 class="pt-2">8. Derechos del Titular</h3>
     <p>
       Conforme a la <strong>Ley N.º 25.326</strong>, los titulares de datos personales tienen
       derecho a:
@@ -76,7 +89,7 @@
       <li><strong>Revocación del consentimiento:</strong> en cualquier momento, sin efecto retroactivo</li>
     </ul>
 
-    <h3 class="pt-2">8. Cookies</h3>
+    <h3 class="pt-2">9. Cookies</h3>
     <p>
       Utilizamos cookies técnicas (necesarias para el funcionamiento del Sitio) y cookies de
       análisis (para mejorar la experiencia del usuario). No utilizamos cookies de rastreo
@@ -84,21 +97,21 @@
       bloquear o eliminar cookies, aunque esto podría afectar la funcionalidad del Sitio.
     </p>
 
-    <h3 class="pt-2">9. Transferencias Internacionales de Datos</h3>
+    <h3 class="pt-2">10. Transferencias Internacionales de Datos</h3>
     <p>
       Algunos de nuestros proveedores de servicios tecnológicos pueden estar ubicados fuera del
       territorio argentino. En tales casos, nos aseguramos de que existan garantías adecuadas de
       protección conforme a la normativa vigente, incluyendo cláusulas contractuales de protección.
     </p>
 
-    <h3 class="pt-2">10. Menores de Edad</h3>
+    <h3 class="pt-2">11. Menores de Edad</h3>
     <p>
       El Sitio no está dirigido a menores de 16 años. No recopilamos intencionadamente datos
       personales de menores de edad. Si nos enteramos de que hemos recopilado datos de un menor,
       procederemos a eliminarlos de inmediato.
     </p>
 
-    <h3 class="pt-2">11. Cambios en esta Política</h3>
+    <h3 class="pt-2">12. Cambios en esta Política</h3>
     <p>
       Nos reservamos el derecho de actualizar esta Política de Privacidad en cualquier momento.
       Los cambios serán publicados en esta página con la fecha de última actualización. Se
