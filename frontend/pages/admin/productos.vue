@@ -6,7 +6,7 @@ import { useFormat } from '~/composables/useFormat'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
-const { currency } = useFormat()
+const { currency, percentage } = useFormat()
 const toast = useToast()
 
 const products = ref<Product[]>([])
@@ -29,7 +29,6 @@ const form = reactive({
   brand: '',
   categoryId: '',
   price: 0,
-  originalPrice: null as number | null,
   discountPercentage: null as number | null,
   cost: null as number | null,
   stock: 0,
@@ -39,6 +38,24 @@ const form = reactive({
   isFeatured: false,
   isOnSale: false,
   isActive: true,
+})
+
+// Descuento real ingresado (se conserva con decimales, sin redondear).
+// Se limita a 6 decimales, la misma precisión que guarda el backend.
+const discountValue = computed(() => {
+  const pct = Number(form.discountPercentage)
+  if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) return 0
+  return Math.round(pct * 1e6) / 1e6
+})
+
+const hasDiscount = computed(() => discountValue.value > 0 && Number(form.price) > 0)
+
+// Precio final = precio de lista menos el descuento. El backend aplica la misma cuenta.
+const finalPrice = computed(() => {
+  const price = Number(form.price) || 0
+  return hasDiscount.value
+    ? Math.round(price * (1 - discountValue.value / 100) * 100) / 100
+    : price
 })
 
 onMounted(async () => {
@@ -74,7 +91,6 @@ function openCreate() {
     brand: '',
     categoryId: '',
     price: 0,
-    originalPrice: null,
     discountPercentage: null,
     cost: null,
     stock: 0,
@@ -96,7 +112,6 @@ function openEdit(product: Product) {
     brand: product.brand || '',
     categoryId: product.categoryId,
     price: Number(product.price),
-    originalPrice: product.originalPrice != null ? Number(product.originalPrice) : null,
     discountPercentage: product.discountPercentage != null ? Number(product.discountPercentage) : null,
     cost: product.cost != null ? Number(product.cost) : null,
     stock: product.stock,
@@ -190,20 +205,22 @@ async function save() {
   saving.value = true
   const highlights = form.highlights.map((h) => h.trim()).filter(Boolean).slice(0, 2)
 
+  // `price` es el precio de lista; el backend deriva el precio final del descuento.
+  const discountPercentageValue = hasDiscount.value ? discountValue.value : null
+
   const payload = {
     name: form.name,
     brand: form.brand || undefined,
     categoryId: form.categoryId,
     price: Number(form.price),
-    originalPrice: form.originalPrice != null ? Number(form.originalPrice) : undefined,
-    discountPercentage: form.discountPercentage != null ? Number(form.discountPercentage) : undefined,
+    discountPercentage: discountPercentageValue,
     cost: form.cost != null ? Number(form.cost) : undefined,
     stock: Number(form.stock),
     description: form.description || undefined,
     images: form.images.length ? form.images : undefined,
     highlights: highlights.length ? highlights : undefined,
     isFeatured: form.isFeatured,
-    isOnSale: form.isOnSale,
+    isOnSale: (discountPercentageValue != null && discountPercentageValue > 0) || form.isOnSale,
     isActive: form.isActive,
   }
 
@@ -292,7 +309,9 @@ function categoryName(id: string) {
               <td class="px-4 py-3 text-slate-600">{{ categoryName(product.categoryId) }}</td>
               <td class="px-4 py-3">
                 <p class="font-bold text-slate-900">{{ currency(product.finalPrice) }}</p>
-                <p v-if="product.originalPrice" class="text-xs text-slate-400 line-through">{{ currency(product.originalPrice) }}</p>
+                <p v-if="product.finalPrice < product.price" class="text-xs text-slate-400 line-through">
+                  {{ currency(product.price) }}
+                </p>
               </td>
               <td class="px-4 py-3">
                 <span class="font-bold" :class="product.stock === 0 ? 'text-red-600' : product.stock <= 5 ? 'text-amber-600' : 'text-slate-800'">
@@ -366,15 +385,21 @@ function categoryName(id: string) {
         </div>
         <div>
           <label class="label-base">Precio *</label>
-          <input v-model.number="form.price" type="number" min="0" class="input-base" />
-        </div>
-        <div>
-          <label class="label-base">Precio anterior</label>
-          <input v-model.number="form.originalPrice" type="number" min="0" class="input-base" />
+          <input v-model.number="form.price" type="number" min="0" class="input-base" placeholder="410000" />
+          <p class="mt-1 text-xs text-slate-400">Precio de lista, sin descuento.</p>
         </div>
         <div>
           <label class="label-base">Descuento %</label>
-          <input v-model.number="form.discountPercentage" type="number" min="0" max="100" class="input-base" />
+          <input v-model.number="form.discountPercentage" type="number" step="any" min="0" max="100" class="input-base" placeholder="21.95122" />
+          <p class="mt-1 text-xs text-slate-400">Podés usar hasta 6 decimales (ej: 21.95122). Dejalo vacío para no aplicar descuento.</p>
+        </div>
+        <div v-if="hasDiscount" class="sm:col-span-2 rounded-xl bg-emerald-50 px-4 py-3">
+          <p class="text-sm font-semibold text-emerald-700">
+            El precio con descuento da un total de: {{ currency(finalPrice) }}
+          </p>
+          <p class="mt-0.5 text-xs text-emerald-600">
+            En la tienda se verá el precio tachado con {{ percentage(discountValue) }}% OFF.
+          </p>
         </div>
         <div>
           <label class="label-base">Stock</label>

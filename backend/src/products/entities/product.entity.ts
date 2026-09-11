@@ -46,11 +46,9 @@ export class Product {
   @Column({ unique: true })
   sku: string;
 
+  /** List price (the price shown crossed out on the storefront when a discount applies). */
   @Column({ type: 'decimal', precision: 12, scale: 2, transformer: decimalToNumber })
   price: number;
-
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true, name: 'original_price', transformer: decimalToNumber })
-  originalPrice: number | null;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true, transformer: decimalToNumber })
   cost: number | null;
@@ -78,7 +76,8 @@ export class Product {
   @Column({ default: false, name: 'is_on_sale' })
   isOnSale: boolean;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true, name: 'discount_percentage', transformer: decimalToNumber })
+  // Scale 6 so exact discounts can be entered (e.g. 21.951220% -> a round final price).
+  @Column({ type: 'decimal', precision: 9, scale: 6, nullable: true, name: 'discount_percentage', transformer: decimalToNumber })
   discountPercentage: number | null;
 
   @Column({ default: true, name: 'is_active' })
@@ -101,8 +100,11 @@ export class Product {
   @AfterLoad()
   computeDerived(): void {
     const price = Number(this.price);
-    if (this.isOnSale && this.discountPercentage) {
-      this.finalPrice = Math.round(price * (1 - Number(this.discountPercentage) / 100) * 100) / 100;
+    const discount = Number(this.discountPercentage);
+    // `price` is the list price; the storefront shows it crossed out and
+    // `finalPrice` as the price to pay whenever a discount is applied.
+    if (this.isOnSale && discount > 0 && discount < 100) {
+      this.finalPrice = Math.round(price * (1 - discount / 100) * 100) / 100;
     } else {
       this.finalPrice = price;
     }

@@ -66,6 +66,15 @@ export const useFormat = () => {
     return '$' + num.toLocaleString('es-AR', { maximumFractionDigits: 2 })
   }
 
+  /**
+   * Formats a percentage as-is, without rounding (e.g. 21,95 or 21,95122).
+   * Up to 6 decimals, matching what the backend stores.
+   */
+  const percentage = (value: number | string | null | undefined): string => {
+    const num = Number(value || 0)
+    return num.toLocaleString('es-AR', { maximumFractionDigits: 6 })
+  }
+
   const date = (value: string | Date | null | undefined): string => {
     if (!value) return '—'
     const d = typeof value === 'string' ? new Date(value) : value
@@ -88,5 +97,5 @@ export const useFormat = () => {
     })
   }
 
-  return { currency, date, dateTime }
+  return { currency, percentage, date, dateTime }
 }

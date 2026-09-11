@@ -33,8 +33,8 @@ export class CreateProductDto {
   @IsString() @IsNotEmpty() categoryId: string;
   @IsOptional() @IsString() brand?: string;
   @IsOptional() @IsString() sku?: string;
+  /** List price; a discount is applied on top when `discountPercentage` is set. */
   @IsNumber() @Min(0) price: number;
-  @IsOptional() @IsNumber() @Min(0) originalPrice?: number;
   @IsOptional() @IsNumber() @Min(0) cost?: number;
   @IsOptional() @IsNumber() @Min(0) stock?: number;
   @IsOptional() @IsArray() images?: string[];
@@ -49,6 +49,6 @@ export class CreateProductDto {
 
   @IsOptional() @IsBoolean() isFeatured?: boolean;
   @IsOptional() @IsBoolean() isOnSale?: boolean;
-  @IsOptional() @IsNumber() @Min(0) @Max(100) discountPercentage?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(100) discountPercentage?: number | null;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }

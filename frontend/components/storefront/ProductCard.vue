@@ -12,7 +12,7 @@ const props = defineProps<{
 
 const auth = useAuthStore()
 const cart = useCartStore()
-const { currency } = useFormat()
+const { currency, percentage } = useFormat()
 const toast = useToast()
 const router = useRouter()
 
@@ -20,8 +20,10 @@ const isFavorite = ref(!!props.product.favoriteId)
 const added = ref(false)
 
 const discount = computed(() => {
-  if (!props.product.originalPrice || props.product.originalPrice <= props.product.price) return null
-  return Math.round(((props.product.originalPrice - props.product.price) / props.product.originalPrice) * 100)
+  const p = props.product
+  const pct = p.discountPercentage != null ? Number(p.discountPercentage) : 0
+  if (pct <= 0 || p.price <= p.finalPrice) return null
+  return `${percentage(pct)}% OFF`
 })
 
 async function addToCart() {
@@ -70,11 +72,7 @@ async function toggleFavorite() {
       <AppImage :src="product.images?.[0]" :alt="product.name" :seed="product.slug" class="h-full w-full object-contain" />
       <div class="absolute left-3 top-3 flex flex-col gap-1.5">
         <span v-if="discount" class="rounded-md bg-green-500 px-2 py-0.5 text-xs font-bold text-white">
-          {{ discount }}% OFF
-        </span>
-        <span v-else-if="product.isFeatured"
-          class="flex items-center gap-1 rounded-md bg-slate-900 px-2 py-0.5 text-xs font-bold text-white dark:bg-white dark:text-slate-900">
-          <Star class="h-3 w-3" fill="currentColor" /> Destacado
+          {{ discount }}
         </span>
       </div>
       <span v-if="!product.isInStock"
@@ -102,7 +100,12 @@ async function toggleFavorite() {
       </NuxtLink>
 
       <div class="mt-auto pt-3">
-        <PriceTag :price="product.finalPrice" :original-price="product.originalPrice" size="sm" />
+        <PriceTag
+          :price="product.finalPrice"
+          :original-price="product.price"
+          :discount-percentage="product.discountPercentage"
+          size="sm"
+        />
         <p class="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
           {{ product.isInStock ? `${product.stock} disponibles` : 'Sin stock' }}
         </p>

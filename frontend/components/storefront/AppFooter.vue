@@ -5,6 +5,18 @@ import Facebook from '~/assets/icon-facebook.png'
 import TikTok from '~/assets/icon-tiktok.png'
 import WhatsApp from '~/assets/icon-wspp.png'
 import logo from '~/assets/logo.png'
+import { useAuthStore } from '~/stores/auth'
+
+const auth = useAuthStore()
+
+onMounted(() => auth.init())
+
+const SUPPORT_WHATSAPP = '5491171383512'
+const supportMessage = 'Hola! Necesito ayuda y soporte con mi compra en TOROX.'
+const supportUrl = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(supportMessage)}`
+
+const accountLink = computed(() => (auth.isAuthenticated ? '/cuenta/perfil' : '/auth/login'))
+const ordersLink = computed(() => (auth.isAuthenticated ? '/cuenta/compras' : '/auth/login'))
 </script>
 
 <template>
@@ -31,17 +43,35 @@ import logo from '~/assets/logo.png'
       <div>
         <h4 class="text-sm font-bold uppercase tracking-wider text-white">Atención al cliente</h4>
         <ul class="mt-4 space-y-2.5 text-sm">
-          <li><NuxtLink to="/auth/login" class="transition hover:text-white">Mi cuenta</NuxtLink></li>
-          <li><NuxtLink to="/auth/login" class="transition hover:text-white">Mis compras</NuxtLink></li>
-          <li><NuxtLink to="/auth/login" class="transition hover:text-white">Estado de pedidos</NuxtLink></li>
-          <li><NuxtLink to="/auth/login" class="transition hover:text-white">Ayuda y soporte</NuxtLink></li>
+          <li><NuxtLink :to="accountLink" class="transition hover:text-white">Mi cuenta</NuxtLink></li>
+          <li><NuxtLink :to="ordersLink" class="transition hover:text-white">Mis compras</NuxtLink></li>
+          <li>
+            <a
+              href="https://www.andreani.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="transition hover:text-white"
+            >
+              Estado de pedidos
+            </a>
+          </li>
+          <li>
+            <a
+              :href="supportUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="transition hover:text-white"
+            >
+              Ayuda y soporte
+            </a>
+          </li>
         </ul>
       </div>
 
       <div>
         <h4 class="text-sm font-bold uppercase tracking-wider text-white">Contacto</h4>
         <ul class="mt-4 space-y-2.5 text-sm">
-          <li class="flex items-center gap-2.5"><Phone class="h-4 w-4 text-brand-400" /> 1171383512</li>
+          <li class="flex items-center gap-2.5"><Phone class="h-4 w-4 text-brand-400" />+54 9 11 7138-3512</li>
           <li class="flex items-center gap-2.5"><Mail class="h-4 w-4 text-brand-400" /> toroxseguridad@gmail.com</li>
           <li class="flex items-center gap-2.5"><MapPin class="h-4 w-4 text-brand-400" /> Buenos Aires, Argentina</li>
         </ul>

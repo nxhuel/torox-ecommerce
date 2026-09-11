@@ -41,9 +41,8 @@ export class CartService {
     if (product.stock < quantity) throw new BadRequestException(`Stock insuficiente. Disponible: ${product.stock}`);
 
     const existingItem = cart.items?.find(i => i.productId === productId);
-    const finalPrice = product.isOnSale && product.discountPercentage
-      ? Number(product.price) * (1 - Number(product.discountPercentage) / 100)
-      : Number(product.price);
+    // `finalPrice` is derived from the list price + discount on the entity.
+    const finalPrice = Number(product.finalPrice);
 
     if (existingItem) {
       const newQty = existingItem.quantity + quantity;

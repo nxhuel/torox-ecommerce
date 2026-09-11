@@ -3,14 +3,18 @@ import { useFormat } from '~/composables/useFormat'
 
 const props = withDefaults(
   defineProps<{
+    /** Price the customer pays (already discounted when applicable). */
     price: number
+    /** List price, shown crossed out when it is higher than `price`. */
     originalPrice?: number | null
+    /** Real discount percentage, rendered as-is (e.g. 21,95% OFF). */
+    discountPercentage?: number | null
     size?: 'sm' | 'md' | 'lg'
   }>(),
-  { originalPrice: null, size: 'md' },
+  { originalPrice: null, discountPercentage: null, size: 'md' },
 )
 
-const { currency } = useFormat()
+const { currency, percentage } = useFormat()
 
 const sizeClasses = computed(() => {
   switch (props.size) {
@@ -23,9 +27,17 @@ const sizeClasses = computed(() => {
   }
 })
 
-const discount = computed(() => {
-  if (!props.originalPrice || props.originalPrice <= props.price) return null
-  return Math.round(((props.originalPrice - props.price) / props.originalPrice) * 100)
+const hasDiscount = computed(
+  () => props.originalPrice != null && props.originalPrice > props.price,
+)
+
+const discountLabel = computed(() => {
+  if (!hasDiscount.value) return null
+  const pct =
+    props.discountPercentage != null && props.discountPercentage > 0
+      ? Number(props.discountPercentage)
+      : ((Number(props.originalPrice) - props.price) / Number(props.originalPrice)) * 100
+  return `${percentage(pct)}% OFF`
 })
 </script>
 
@@ -35,17 +47,17 @@ const discount = computed(() => {
       {{ currency(price) }}
     </span>
     <span
-      v-if="discount"
+      v-if="hasDiscount"
       class="font-medium text-slate-400 line-through"
       :class="sizeClasses.original"
     >
       {{ currency(originalPrice) }}
     </span>
     <span
-      v-if="discount"
+      v-if="discountLabel"
       class="rounded bg-green-50 px-1.5 py-0.5 text-xs font-bold text-green-600"
     >
-      {{ discount }}% OFF
+      {{ discountLabel }}
     </span>
   </div>
 </template>

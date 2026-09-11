@@ -24,6 +24,11 @@ export class ProductsService {
   async findAll(query: QueryProductDto) {
     const { search, categoryId, brand, minPrice, maxPrice, isOnSale, isFeatured, inStock, sortBy, page = 1, limit = 12 } = query;
 
+    // Price the customer actually pays: list price minus the discount, when any.
+    const effectivePrice =
+      "(CASE WHEN p.is_on_sale = true AND p.discount_percentage > 0 AND p.discount_percentage < 100 " +
+      'THEN p.price * (1 - p.discount_percentage / 100) ELSE p.price END)';
+
     const qb = this.repo.createQueryBuilder('p')
       .leftJoinAndSelect('p.category', 'cat')
       .where('p.is_active = true');
@@ -41,15 +46,15 @@ export class ProductsService {
       }
     }
     if (brand) qb.andWhere('p.brand ILIKE :brand', { brand: `%${brand}%` });
-    if (minPrice !== undefined) qb.andWhere('p.price >= :minPrice', { minPrice });
-    if (maxPrice !== undefined) qb.andWhere('p.price <= :maxPrice', { maxPrice });
+    if (minPrice !== undefined) qb.andWhere(`${effectivePrice} >= :minPrice`, { minPrice });
+    if (maxPrice !== undefined) qb.andWhere(`${effectivePrice} <= :maxPrice`, { maxPrice });
     if (isOnSale) qb.andWhere('p.is_on_sale = true');
     if (isFeatured) qb.andWhere('p.is_featured = true');
     if (inStock) qb.andWhere('p.stock > 0');
 
     switch (sortBy) {
-      case 'price_asc': qb.orderBy('p.price', 'ASC'); break;
-      case 'price_desc': qb.orderBy('p.price', 'DESC'); break;
+      case 'price_asc': qb.orderBy(effectivePrice, 'ASC'); break;
+      case 'price_desc': qb.orderBy(effectivePrice, 'DESC'); break;
       case 'best_sellers': qb.orderBy('p.sales_count', 'DESC'); break;
       default: qb.orderBy('p.is_featured', 'DESC').addOrderBy('p.created_at', 'DESC');
     }

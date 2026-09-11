@@ -158,7 +158,6 @@ export class SeedService implements OnApplicationBootstrap {
         brand: p.brand,
         sku: `TORX-${p.slug.toUpperCase().replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
         price: p.price,
-        originalPrice: p.originalPrice,
         cost: p.cost,
         stock: p.stock,
         images: p.images,

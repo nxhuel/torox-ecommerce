@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Search, Users, ChevronRight, Mail, Phone, CalendarDays } from 'lucide-vue-next'
+import { Search, Users, ChevronRight, Mail, Phone, CalendarDays, Trash2 } from 'lucide-vue-next'
 import type { Order, User } from '~/types'
 import { ordersService, usersService } from '~/services'
 import { useFormat } from '~/composables/useFormat'
@@ -7,12 +7,14 @@ import { useFormat } from '~/composables/useFormat'
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { currency, date } = useFormat()
+const toast = useToast()
 const customers = ref<User[]>([])
 const loading = ref(true)
 const search = ref('')
 const selected = ref<User | null>(null)
 const selectedOrders = ref<Order[]>([])
 const detailLoading = ref(false)
+const deleting = ref<string | null>(null)
 
 onMounted(load)
 
@@ -49,6 +51,21 @@ async function openDetail(customer: User) {
   }
 }
 
+async function removeCustomer(customer: User, closeModal = false) {
+  if (!confirm(`¿Eliminar al cliente "${customer.firstName} ${customer.lastName}"?\n\nEsta acción no se puede deshacer.`)) return
+  deleting.value = customer.id
+  try {
+    await usersService.remove(customer.id)
+    customers.value = customers.value.filter((c) => c.id !== customer.id)
+    toast.success(`Cliente ${customer.firstName} eliminado`)
+    if (closeModal) selected.value = null
+  } catch (err: any) {
+    toast.error(err.message || 'No se pudo eliminar el cliente')
+  } finally {
+    deleting.value = null
+  }
+}
+
 const totalSpent = computed(() =>
   selectedOrders.value
     .filter((o) => !['CANCELLED', 'PENDING_PAYMENT'].includes(o.status))
@@ -79,18 +96,17 @@ const totalSpent = computed(() =>
               <th class="px-4 py-3">Cliente</th>
               <th class="px-4 py-3">Contacto</th>
               <th class="px-4 py-3">Registro</th>
-              <th class="px-4 py-3 text-right">Detalle</th>
+              <th class="px-4 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="customer in filtered"
               :key="customer.id"
-              class="cursor-pointer border-b border-slate-50 transition hover:bg-slate-50/50"
-              @click="openDetail(customer)"
+              class="border-b border-slate-50 transition hover:bg-slate-50/50"
             >
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-3">
+              <td class="px-4 py-3" @click="openDetail(customer)">
+                <div class="flex cursor-pointer items-center gap-3">
                   <span class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 font-bold text-brand-600">
                     {{ customer.firstName?.[0] }}{{ customer.lastName?.[0] }}
                   </span>
@@ -100,15 +116,31 @@ const totalSpent = computed(() =>
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-3">
-                <p class="flex items-center gap-1.5 text-slate-600"><Mail class="h-3.5 w-3.5 text-slate-300" /> {{ customer.email }}</p>
-                <p v-if="customer.phone" class="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">
+              <td class="px-4 py-3" @click="openDetail(customer)">
+                <p class="flex cursor-pointer items-center gap-1.5 text-slate-600"><Mail class="h-3.5 w-3.5 text-slate-300" /> {{ customer.email }}</p>
+                <p v-if="customer.phone" class="mt-0.5 flex cursor-pointer items-center gap-1.5 text-xs text-slate-400">
                   <Phone class="h-3 w-3 text-slate-300" /> {{ customer.phone }}
                 </p>
               </td>
-              <td class="px-4 py-3 text-slate-600">{{ date(customer.createdAt) }}</td>
-              <td class="px-4 py-3 text-right">
-                <ChevronRight class="ml-auto h-4 w-4 text-slate-300" />
+              <td class="cursor-pointer px-4 py-3 text-slate-600" @click="openDetail(customer)">{{ date(customer.createdAt) }}</td>
+              <td class="px-4 py-3">
+                <div class="flex items-center justify-end gap-1">
+                  <button
+                    class="rounded-lg p-2 text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
+                    aria-label="Ver detalle"
+                    @click="openDetail(customer)"
+                  >
+                    <ChevronRight class="h-4 w-4" />
+                  </button>
+                  <button
+                    class="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                    aria-label="Eliminar cliente"
+                    :disabled="deleting === customer.id"
+                    @click.stop="removeCustomer(customer)"
+                  >
+                    <Trash2 class="h-4 w-4" />
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -174,6 +206,18 @@ const totalSpent = computed(() =>
         <p v-else class="rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400">
           Este cliente aún no realizó compras.
         </p>
+
+        <!-- Delete button in modal -->
+        <div class="mt-6 flex justify-end border-t border-slate-100 pt-4">
+          <button
+            class="flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+            :disabled="deleting === selected.id"
+            @click="removeCustomer(selected, true)"
+          >
+            <Trash2 class="h-4 w-4" />
+            Eliminar cliente
+          </button>
+        </div>
       </template>
     </BaseModal>
   </div>

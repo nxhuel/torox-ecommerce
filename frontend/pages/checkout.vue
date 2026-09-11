@@ -114,7 +114,8 @@ const shippingCost = computed(() => {
   return cart.cart.shippingCost
 })
 
-const total = computed(() => (cart.cart?.subtotal || 0) - (cart.cart?.discount || 0) + shippingCost.value)
+// El total lo calcula el backend: subtotal + shippingCost (el descuento ya está aplicado en el subtotal)
+const total = computed(() => (cart.cart?.total || 0))
 
 function formatCardNumber() {
   const digits = form.cardNumber.replace(/\D/g, '').slice(0, 16)
@@ -229,11 +230,11 @@ async function placeOrder() {
 </script>
 
 <template>
-  <div class="container-torox py-8">
+  <div class="container-torox py-8 w-full overflow-x-hidden">
     <h1 class="mb-8 text-2xl font-bold text-slate-900 sm:text-3xl">Finalizar compra</h1>
 
     <!-- Steps -->
-    <ol class="mb-10 flex items-center gap-0">
+    <ol class="mb-10 flex w-full min-w-0 items-center gap-0">
       <li v-for="(s, index) in steps" :key="s.number" class="flex flex-1 items-center last:flex-none">
         <div class="flex flex-col items-center gap-1.5 sm:flex-row sm:gap-2.5">
           <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition"
@@ -251,13 +252,15 @@ async function placeOrder() {
             {{ s.label }}
           </span>
         </div>
-        <div v-if="index < steps.length - 1" class="mx-3 h-0.5 flex-1 rounded"
+        <div v-if="index < steps.length - 1" class="mx-2 h-0.5 flex-1 rounded sm:mx-3"
           :class="step > s.number ? 'bg-emerald-500' : 'bg-slate-200'" />
       </li>
     </ol>
 
-    <div class="grid gap-8 lg:grid-cols-[1fr_360px]">
-      <div class="space-y-6">
+    <!-- grid-cols-1 keeps the mobile column clamped to the viewport (an implicit
+         `auto` track would grow past it with long product names, clipping everything). -->
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
+      <div class="min-w-0 space-y-6">
         <p v-if="error" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {{ error }}
         </p>
@@ -310,14 +313,14 @@ async function placeOrder() {
               <label class="label-base" for="postalCode">Código postal *</label>
               <input id="postalCode" v-model="form.postalCode" class="input-base" placeholder="1900" />
             </div>
-            <div class="grid grid-cols-[1fr_110px] gap-3">
-              <div>
+            <div class="grid grid-cols-[minmax(0,1fr)_80px] gap-3">
+              <div class="min-w-0">
                 <label class="label-base" for="address">Dirección *</label>
-                <input id="address" v-model="form.address" class="input-base" placeholder="Calle" />
+                <input id="address" v-model="form.address" class="input-base w-full" placeholder="Calle" />
               </div>
               <div>
-                <label class="label-base" for="number">Número *</label>
-                <input id="number" v-model="form.number" class="input-base" placeholder="1234" />
+                <label class="label-base" for="number">Nro. *</label>
+                <input id="number" v-model="form.number" class="input-base" placeholder="123" />
               </div>
             </div>
             <div>
@@ -360,7 +363,7 @@ async function placeOrder() {
           </div>
           <h2 class="mb-5 text-lg font-bold text-slate-900">Método de pago</h2>
 
-          <div class="grid gap-3 sm:grid-cols-3">
+          <div class="grid gap-3 grid-cols-1 sm:grid-cols-3">
             <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition"
               :class="form.paymentMethod === 'CREDIT_CARD' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'">
               <input v-model="form.paymentMethod" type="radio" value="CREDIT_CARD" class="h-4 w-4 text-brand-600" />
@@ -440,10 +443,10 @@ async function placeOrder() {
         </div>
 
         <!-- Nav buttons -->
-        <div class="flex items-center justify-between">
-          <button v-if="step > 1" class="btn-secondary" @click="back">Volver</button>
+        <div class="flex items-center justify-between gap-3">
+          <button v-if="step > 1" class="btn-secondary shrink-0" @click="back">Volver</button>
           <span v-else />
-          <button class="btn-primary !px-8 !py-3" :disabled="processing" @click="next">
+          <button class="btn-primary flex-1 !px-8 !py-3 sm:flex-none" :disabled="processing" @click="next">
             <Loader2 v-if="processing" class="h-4 w-4 animate-spin" />
             <template v-else>
               {{ step < 4 ? 'Continuar' : 'Confirmar pago' }} </template>
@@ -452,7 +455,7 @@ async function placeOrder() {
       </div>
 
       <!-- Summary sidebar -->
-      <aside class="h-fit rounded-xl border border-slate-200 bg-white p-6 shadow-card lg:sticky lg:top-24">
+      <aside class="h-fit min-w-0 rounded-xl border border-slate-200 bg-white p-6 shadow-card lg:sticky lg:top-24">
         <h2 class="text-lg font-bold text-slate-900">Tu compra</h2>
         <div class="mt-4 max-h-72 space-y-3 overflow-y-auto pr-1">
           <div v-for="item in cart.cart?.items" :key="item.id" class="flex items-center gap-3">
@@ -464,29 +467,34 @@ async function placeOrder() {
                 {{ item.quantity }}
               </span>
             </div>
-            <p class="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">
-              {{ item.productSnapshot?.name }}
-            </p>
-            <p class="text-sm font-semibold text-slate-900">{{ currency(item.unitPrice * item.quantity) }}</p>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-medium text-slate-700">
+                {{ item.productSnapshot?.name }}
+              </p>
+              <p class="text-xs text-slate-400">
+                {{ currency(item.unitPrice) }} x {{ item.quantity }}
+              </p>
+            </div>
+            <p class="shrink-0 text-sm font-semibold text-slate-900">{{ currency(item.unitPrice * item.quantity) }}</p>
           </div>
         </div>
         <div class="mt-4 space-y-2 border-t border-slate-100 pt-4 text-sm">
           <div class="flex justify-between text-slate-600">
-            <span>Subtotal</span>
+            <span>Subtotal ({{ cart.cart?.items.length }} art{{ cart.cart?.items.length === 1 ? 'ículo' : 'ículos' }})</span>
             <span class="font-semibold text-slate-900">{{ currency(cart.cart?.subtotal || 0) }}</span>
           </div>
           <div v-if="(cart.cart?.discount || 0) > 0" class="flex justify-between text-emerald-600">
-            <span>Descuentos</span>
+            <span>Descuentos aplicados</span>
             <span class="font-semibold">-{{ currency(cart.cart?.discount || 0) }}</span>
           </div>
           <div class="flex justify-between text-slate-600">
             <span>Envío</span>
             <span class="font-semibold" :class="shippingCost === 0 ? 'text-emerald-600' : 'text-slate-900'">
-              {{ shippingCost === 0 ? '$3.000 (PS)' : currency(shippingCost) }}
+              {{ shippingCost === 0 ? '$0 (PS)' : currency(shippingCost) }}
             </span>
           </div>
           <div class="flex justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
-            <span>Total</span>
+            <span>Total a pagar</span>
             <span>{{ currency(total) }}</span>
           </div>
         </div>

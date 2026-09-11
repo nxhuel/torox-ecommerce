@@ -20,7 +20,7 @@ onMounted(() => {
 <template>
   <div class="flex min-h-screen flex-col">
     <AppNavbar v-if="!isAuthRoute" />
-    <main class="flex-1">
+    <main class="flex-1" style="overflow-x: clip;">
       <slot />
     </main>
     <AppFooter v-if="!isAuthRoute" />

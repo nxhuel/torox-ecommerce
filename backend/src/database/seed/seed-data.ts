@@ -12,8 +12,8 @@ export interface SeedProduct {
   slug: string;
   categorySlug: string;
   brand: string;
+  /** List price; when `discountPercentage` is set the storefront shows it crossed out. */
   price: number;
-  originalPrice?: number;
   discountPercentage?: number;
   cost: number;
   stock: number;
@@ -104,8 +104,7 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     slug: 'camara-ip-wifi-2k-hikvision',
     categorySlug: 'camaras-ip',
     brand: 'Hikvision',
-    price: 89999,
-    originalPrice: 109999,
+    price: 109999,
     discountPercentage: 18,
     cost: 52000,
     stock: 25,
@@ -130,8 +129,7 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     slug: 'kit-cctv-4-camaras-1080p-dahua',
     categorySlug: 'camaras-exteriores',
     brand: 'Dahua',
-    price: 249999,
-    originalPrice: 289999,
+    price: 289999,
     discountPercentage: 14,
     cost: 145000,
     stock: 10,
@@ -177,8 +175,7 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     slug: 'camara-interior-full-hd-tp-link',
     categorySlug: 'camaras-interiores',
     brand: 'TP-Link',
-    price: 59999,
-    originalPrice: 69999,
+    price: 69999,
     discountPercentage: 15,
     cost: 34000,
     stock: 40,
@@ -243,8 +240,7 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     slug: 'alarma-gsm-hogar-smanos',
     categorySlug: 'sistemas-de-alarma',
     brand: 'Smanos',
-    price: 54999,
-    originalPrice: 68999,
+    price: 68999,
     discountPercentage: 20,
     cost: 31000,
     stock: 30,
@@ -307,8 +303,7 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     slug: 'videoportero-wifi-hikvision',
     categorySlug: 'videoporteros',
     brand: 'Hikvision',
-    price: 84999,
-    originalPrice: 94999,
+    price: 94999,
     discountPercentage: 10,
     cost: 47000,
     stock: 18,
@@ -351,8 +346,7 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     slug: 'cerradura-smart-wifi-xiaomi',
     categorySlug: 'cerraduras-inteligentes',
     brand: 'Xiaomi',
-    price: 129999,
-    originalPrice: 147999,
+    price: 147999,
     discountPercentage: 12,
     cost: 73000,
     stock: 22,
@@ -436,8 +430,7 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     slug: 'sensor-apertura-ajax',
     categorySlug: 'sensores-apertura',
     brand: 'Ajax',
-    price: 14999,
-    originalPrice: 19999,
+    price: 19999,
     discountPercentage: 25,
     cost: 8000,
     stock: 5,
@@ -496,8 +489,7 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     slug: 'cable-utp-cat6-305m',
     categorySlug: 'accesorios',
     brand: 'Inter',
-    price: 29999,
-    originalPrice: 35999,
+    price: 35999,
     discountPercentage: 16,
     cost: 16500,
     stock: 32,

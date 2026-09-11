@@ -147,8 +147,8 @@ async function loadFeatured() {
     </div>
 
     <!-- Featured -->
-    <section class="-mt-12 bg-slate-100 pt-12 pb-12 dark:bg-dark-900 lg:-mt-14 lg:pt-14 lg:pb-16">
-      <div class="container-torox pt-8">
+    <section class="-mt-12 bg-slate-100 pt-12 pb-12 dark:bg-dark-900 lg:-mt-14 lg:pt-14 lg:pb-16 overflow-x-hidden">
+      <div class="container-torox pt-8 overflow-x-hidden">
         <div class="mb-8 flex items-end justify-between">
           <div>
             <h2 class="text-2xl font-bold text-slate-900 sm:text-3xl dark:text-white">Productos destacados</h2>

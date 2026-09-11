@@ -35,7 +35,7 @@ function productImage(item: any) {
 </script>
 
 <template>
-  <div class="container-torox py-8">
+  <div class="container-torox py-8 overflow-x-hidden">
     <h1 class="mb-8 text-2xl font-bold text-slate-900 sm:text-3xl">Mi carrito</h1>
 
     <div v-if="cart.loading" class="space-y-4">
@@ -43,9 +43,11 @@ function productImage(item: any) {
     </div>
 
     <template v-else-if="cart.cart && cart.cart.items.length">
-      <div class="grid gap-8 lg:grid-cols-[1fr_360px]">
+      <!-- grid-cols-1 clamps the mobile column to the viewport (an implicit `auto`
+           track would grow with long product names and clip the whole page). -->
+      <div class="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
         <!-- Items -->
-        <div class="space-y-4">
+        <div class="min-w-0 space-y-4">
           <div
             v-for="item in cart.cart.items"
             :key="item.id"
@@ -54,7 +56,7 @@ function productImage(item: any) {
             <NuxtLink :to="productLink(item)" class="h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-100">
               <AppImage :src="productImage(item)" :alt="productName(item)" :seed="item.productId" class="h-full w-full" />
             </NuxtLink>
-            <div class="flex min-w-0 flex-1 flex-col">
+            <div class="flex min-w-0 flex-1 flex-col overflow-x-hidden">
               <div class="flex items-start justify-between gap-3">
                 <NuxtLink :to="productLink(item)" class="line-clamp-2 text-sm font-semibold text-slate-800 hover:text-brand-700">
                   {{ productName(item) }}
@@ -82,7 +84,7 @@ function productImage(item: any) {
         </div>
 
         <!-- Summary -->
-        <aside class="h-fit rounded-xl border border-slate-200 bg-white p-6 shadow-card lg:sticky lg:top-24">
+        <aside class="h-fit min-w-0 rounded-xl border border-slate-200 bg-white p-6 shadow-card lg:sticky lg:top-24">
           <h2 class="text-lg font-bold text-slate-900">Resumen de compra</h2>
           <div class="mt-4 space-y-2.5 text-sm">
             <div class="flex justify-between text-slate-600">

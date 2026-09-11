@@ -9,7 +9,7 @@ import {
   ChevronRight,
   Check,
 } from 'lucide-vue-next'
-import type { Product } from '~/types'
+import type { Product, SpecGroup } from '~/types'
 import { Video } from 'lucide-vue-next'
 import { favoritesService, productsService } from '~/services'
 import { useAuthStore } from '~/stores/auth'
@@ -20,7 +20,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const cart = useCartStore()
-const { currency } = useFormat()
+const { currency, percentage } = useFormat()
 const toast = useToast()
 
 const product = ref<Product | null>(null)
@@ -58,8 +58,9 @@ onMounted(async () => {
 
 const discount = computed(() => {
   const p = product.value
-  if (!p?.originalPrice || p.originalPrice <= p.price) return null
-  return Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)
+  const pct = p?.discountPercentage != null ? Number(p.discountPercentage) : 0
+  if (!p || pct <= 0 || p.price <= p.finalPrice) return null
+  return pct
 })
 
 /** Grouped tables: admin-defined groups, or a fallback from the flat specs. */
@@ -165,7 +166,7 @@ function isVideo(url: string) {
               <AppImage :src="currentMedia" :alt="product.name" :seed="product.slug" class="aspect-square w-full" />
               <span v-if="discount"
                 class="absolute left-4 top-4 rounded-lg bg-green-500 px-3 py-1 text-sm font-bold text-white shadow">
-                {{ discount }}% OFF
+                {{ percentage(discount) }}% OFF
               </span>
             </template>
           </div>
@@ -199,9 +200,14 @@ function isVideo(url: string) {
           </div>
 
           <div class="mt-5 rounded-xl border border-slate-200 bg-white p-5">
-            <PriceTag :price="product.finalPrice" :original-price="product.originalPrice" size="lg" />
+            <PriceTag
+              :price="product.finalPrice"
+              :original-price="product.price"
+              :discount-percentage="product.discountPercentage"
+              size="lg"
+            />
             <p v-if="discount" class="mt-1 text-sm text-red-600">
-              Ahorrás {{ currency((product.originalPrice || 0) - product.finalPrice) }}
+              Ahorrás {{ currency(product.price - product.finalPrice) }}
             </p>
             <div class="mt-5 flex items-center gap-4">
               <QuantitySelector v-model="quantity" :max="Math.max(1, product.stock)" />

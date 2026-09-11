@@ -133,9 +133,9 @@ const activeCategory = computed(() =>
 </script>
 
 <template>
-  <div class="container-torox py-8">
+  <div class="container-torox py-8 overflow-x-hidden">
     <!-- Title -->
-    <div class="mb-6">
+    <div class="mb-6 overflow-x-hidden">
       <nav class="text-xs text-slate-400">
         <NuxtLink to="/" class="hover:text-brand-600">Inicio</NuxtLink>
         <span class="mx-1.5">/</span>
@@ -147,9 +147,9 @@ const activeCategory = computed(() =>
       <p class="mt-1 text-sm text-slate-500">{{ total }} productos encontrados</p>
     </div>
 
-    <div class="grid gap-6 lg:grid-cols-[250px_1fr]">
+    <div class="grid gap-6 lg:grid-cols-[250px_1fr] overflow-x-hidden">
       <!-- Filters sidebar -->
-      <aside class="hidden lg:block">
+      <aside class="hidden lg:block overflow-x-hidden">
         <div class="sticky top-24 space-y-5">
           <div>
             <h3 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">Categorías</h3>
@@ -210,9 +210,9 @@ const activeCategory = computed(() =>
       </aside>
 
       <!-- Results -->
-      <div>
+      <div class="overflow-x-hidden">
         <!-- Toolbar -->
-        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3 overflow-x-hidden">
           <button
             class="btn-secondary lg:hidden"
             @click="mobileFilters = true"
@@ -231,10 +231,10 @@ const activeCategory = computed(() =>
         </div>
 
         <!-- Grid -->
-        <div v-if="loading" class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+        <div v-if="loading" class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 overflow-x-hidden">
           <BaseSkeleton v-for="i in 8" :key="i" class="aspect-[3/4] !rounded-xl" />
         </div>
-        <div v-else-if="products.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+        <div v-else-if="products.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 overflow-x-hidden">
           <ProductCard v-for="product in products" :key="product.id" :product="product" />
         </div>
         <EmptyState

@@ -51,8 +51,8 @@ export interface Product {
   category?: Category
   brand?: string | null
   sku: string
+  /** List price. Shown crossed out when `discountPercentage` applies. */
   price: number
-  originalPrice?: number | null
   cost?: number | null
   stock: number
   images: string[]

@@ -3,7 +3,7 @@ import { ThumbsUp, Star, ChevronLeft, ChevronRight, CalendarDays, Check } from '
 
 const testimonials = [
   {
-    name: 'Martina López',
+    name: 'Martina',
     location: 'Casa · Villa Urquiza',
     initials: 'ML',
     color: 'bg-gradient-to-br from-brand-500 to-brand-700',
@@ -11,7 +11,7 @@ const testimonials = [
     date: '12 de marzo de 2026',
   },
   {
-    name: 'Gonzalo Pérez',
+    name: 'Gonzalo',
     location: 'Empresa · Microcentro',
     initials: 'GP',
     color: 'bg-gradient-to-br from-emerald-500 to-emerald-700',
@@ -19,7 +19,7 @@ const testimonials = [
     date: '28 de febrero de 2026',
   },
   {
-    name: 'Sofía Aguirre',
+    name: 'Sofía',
     location: 'Hogar · Belgrano',
     initials: 'SA',
     color: 'bg-gradient-to-br from-rose-500 to-pink-700',
@@ -27,7 +27,7 @@ const testimonials = [
     date: '21 de enero de 2026',
   },
   {
-    name: 'Julián Sosa',
+    name: 'Julián',
     location: 'Empresa · Avellaneda',
     initials: 'JS',
     color: 'bg-gradient-to-br from-cyan-500 to-sky-700',

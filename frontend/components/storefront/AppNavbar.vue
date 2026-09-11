@@ -19,14 +19,17 @@ import {
 import { useAuthStore } from '~/stores/auth'
 import { useCartStore } from '~/stores/cart'
 import { useNotificationsStore } from '~/stores/notifications'
+import { productsService } from '~/services'
 import logo from '~/assets/logo.png'
 import { useTheme } from '~/composables/useTheme'
+import { useFormat } from '~/composables/useFormat'
 
 const router = useRouter()
 const auth = useAuthStore()
 const cart = useCartStore()
 const notifications = useNotificationsStore()
 const { isDark: isDarkTheme, toggle: toggleTheme } = useTheme()
+const { currency } = useFormat()
 const toast = useToast()
 
 const searchQuery = ref('')
@@ -35,6 +38,13 @@ const accountOpen = ref(false)
 const notifOpen = ref(false)
 const notifMenuRef = ref<HTMLElement | null>(null)
 const location = ref('Buenos Aires')
+
+// Autocomplete
+const searchResults = ref<any[]>([])
+const searchOpen = ref(false)
+const searchLoading = ref(false)
+let searchDebounce: ReturnType<typeof setTimeout> | null = null
+
 onMounted(() => {
   auth.init()
   cart.init()
@@ -46,6 +56,11 @@ function onClickOutside(event: MouseEvent) {
   if (notifMenuRef.value && !notifMenuRef.value.contains(event.target as Node)) {
     notifOpen.value = false
   }
+  // Close search dropdown if clicking outside
+  const searchContainers = document.querySelectorAll('.search-container')
+  let insideSearch = false
+  searchContainers.forEach((el) => { if (el.contains(event.target as Node)) insideSearch = true })
+  if (!insideSearch) searchOpen.value = false
 }
 
 const recentNotifications = computed(() => notifications.items.slice(0, 3))
@@ -60,8 +75,38 @@ async function openNotification(id: string) {
   if (item && !item.isRead) await notifications.markRead(id)
 }
 
+function onSearchInput() {
+  const q = searchQuery.value.trim()
+  if (!q || q.length < 2) {
+    searchResults.value = []
+    searchOpen.value = false
+    return
+  }
+  if (searchDebounce) clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(async () => {
+    searchLoading.value = true
+    try {
+      const result = await productsService.all({ search: q, limit: 5 })
+      searchResults.value = result.items || []
+      searchOpen.value = searchResults.value.length > 0
+    } catch {
+      searchResults.value = []
+    } finally {
+      searchLoading.value = false
+    }
+  }, 300)
+}
+
+function goToProduct(slug: string) {
+  searchOpen.value = false
+  searchQuery.value = ''
+  searchResults.value = []
+  router.push(`/productos/${slug}`)
+}
+
 function submitSearch() {
   const q = searchQuery.value.trim()
+  searchOpen.value = false
   router.push(q ? { path: '/productos', query: { search: q } } : '/productos')
   mobileOpen.value = false
 }
@@ -80,11 +125,12 @@ function logout() {
 
 onUnmounted(() => {
   document.removeEventListener('click', onClickOutside)
+  if (searchDebounce) clearTimeout(searchDebounce)
 })
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 bg-white shadow-sm">
+  <header class="sticky top-0 z-50 bg-white shadow-sm">
     <!-- First row -->
     <div class="border-b border-slate-100">
       <div class="container-torox flex h-20 items-center gap-4">
@@ -107,13 +153,16 @@ onUnmounted(() => {
         </NuxtLink>
 
         <!-- Search -->
-        <form class="hidden flex-1 items-center lg:flex" @submit.prevent="submitSearch">
-          <div class="relative w-full max-w-2xl">
+        <form class="search-container hidden flex-1 min-w-0 items-center lg:flex" @submit.prevent="submitSearch">
+          <div class="relative w-full">
             <input
               v-model="searchQuery"
               type="text"
               placeholder="Buscar productos, marcas y más..."
               class="input-base !rounded-full !py-2.5 !pl-4 !pr-12"
+              autocomplete="off"
+              @input="onSearchInput"
+              @keydown.escape="searchOpen = false"
             />
             <button
               type="submit"
@@ -122,10 +171,43 @@ onUnmounted(() => {
             >
               <Search class="h-4 w-4" />
             </button>
+            <!-- Autocomplete dropdown -->
+            <Transition name="dropdown">
+              <div
+                v-if="searchOpen"
+                class="absolute left-0 top-full z-[70] mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl"
+              >
+                <div v-if="searchLoading" class="px-4 py-3 text-sm text-slate-400">Buscando...</div>
+                <template v-else>
+                  <button
+                    v-for="product in searchResults"
+                    :key="product.id"
+                    class="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50"
+                    @click="goToProduct(product.slug)"
+                  >
+                    <div class="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                      <AppImage :src="product.images?.[0]" :alt="product.name" :seed="product.slug" class="h-full w-full" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-semibold text-slate-800">{{ product.name }}</p>
+                      <p class="truncate text-xs text-slate-400">{{ product.brand || '' }}{{ product.brand && product.categoryName ? ' • ' : '' }}{{ product.categoryName || '' }}</p>
+                    </div>
+                    <span class="shrink-0 text-sm font-bold text-brand-600">{{ currency(product.finalPrice || product.price) }}</span>
+                  </button>
+                  <NuxtLink
+                    :to="{ path: '/productos', query: { search: searchQuery } }"
+                    class="block border-t border-slate-100 px-4 py-2.5 text-center text-sm font-semibold text-brand-600 hover:bg-brand-50"
+                    @click="searchOpen = false"
+                  >
+                    Ver todos los resultados
+                  </NuxtLink>
+                </template>
+              </div>
+            </Transition>
           </div>
         </form>
 
-        <div class="ml-auto flex items-center gap-1 sm:gap-2">
+        <div class="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
           <!-- Theme toggle -->
           <button
             class="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100"
@@ -166,7 +248,7 @@ onUnmounted(() => {
               <Transition name="dropdown">
                 <div
                   v-if="accountOpen"
-                  class="absolute right-0 top-full mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 shadow-lg"
+                  class="absolute right-0 top-full z-[60] mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 shadow-lg"
                   @click="accountOpen = false"
                 >
                   <NuxtLink to="/cuenta/perfil" class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
@@ -289,13 +371,16 @@ onUnmounted(() => {
       </div>
 
       <!-- Mobile search -->
-      <form class="border-t border-slate-100 px-4 py-2 lg:hidden" @submit.prevent="submitSearch">
+      <form class="search-container border-t border-slate-100 px-4 py-2 lg:hidden" @submit.prevent="submitSearch">
         <div class="relative">
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Buscar productos, marcas y más..."
             class="input-base !rounded-full !pl-4 !pr-11"
+            autocomplete="off"
+            @input="onSearchInput"
+            @keydown.escape="searchOpen = false"
           />
           <button
             type="submit"
@@ -304,13 +389,44 @@ onUnmounted(() => {
           >
             <Search class="h-4 w-4" />
           </button>
+          <!-- Mobile autocomplete dropdown -->
+          <Transition name="dropdown">
+            <div
+              v-if="searchOpen"
+              class="absolute left-0 top-full z-[70] mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl"
+            >
+              <div v-if="searchLoading" class="px-4 py-3 text-sm text-slate-400">Buscando...</div>
+              <template v-else>
+                <button
+                  v-for="product in searchResults"
+                  :key="product.id"
+                  class="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50"
+                  @click="goToProduct(product.slug)"
+                >
+                  <div class="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                    <AppImage :src="product.images?.[0]" :alt="product.name" :seed="product.slug" class="h-full w-full" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-semibold text-slate-800">{{ product.name }}</p>
+                    <p class="truncate text-xs text-slate-400">{{ product.brand || '' }}</p>
+                  </div>
+                  <span class="shrink-0 text-sm font-bold text-brand-600">{{ currency(product.finalPrice || product.price) }}</span>
+                </button>
+                <NuxtLink
+                  :to="{ path: '/productos', query: { search: searchQuery } }"
+                  class="block border-t border-slate-100 px-4 py-2.5 text-center text-sm font-semibold text-brand-600 hover:bg-brand-50"
+                  @click="searchOpen = false; mobileOpen = false"
+                >
+                  Ver todos los resultados
+                </NuxtLink>
+              </template>
+            </div>
+          </Transition>
         </div>
       </form>
-    </div>
-
-    <!-- Second row -->
-    <div class="hidden border-b border-slate-100 bg-slate-50/60 lg:block">
-      <div class="container-torox flex h-11 items-center justify-between text-sm">
+    </div>      <!-- Second row -->
+    <div class="hidden border-b border-slate-100 bg-slate-50/60 lg:block overflow-x-hidden">
+      <div class="container-torox flex w-full max-w-7xl mx-auto h-11 items-center justify-between text-sm overflow-x-hidden">
         <nav class="flex items-center gap-1">
           <NuxtLink to="/productos" class="rounded-lg px-3 py-1.5 font-medium text-slate-700 transition hover:bg-slate-100 hover:text-brand-700">
             Productos

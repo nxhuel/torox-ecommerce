@@ -226,6 +226,7 @@ export const usersService = {
   updateMe: (data: Partial<User> & { password?: string }) => api().api<User>('/users/me', { method: 'PATCH', body: data as any }),
   update: (id: string, data: Partial<User>) =>
     api().api<User>(`/users/${id}`, { method: 'PATCH', body: data }),
+  remove: (id: string) => api().api(`/users/${id}`, { method: 'DELETE' }),
 }
 
 export type { Paginated, Payment }
