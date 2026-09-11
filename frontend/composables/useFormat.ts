@@ -67,12 +67,12 @@ export const useFormat = () => {
   }
 
   /**
-   * Formats a percentage as-is, without rounding (e.g. 21,95 or 21,95122).
-   * Up to 6 decimals, matching what the backend stores.
+   * Formats a percentage for display (max 2 integer digits, 2 decimal digits).
+   * Keeps whole percentages like "5" and trims long backend values like 21,95122 → 21,95.
    */
   const percentage = (value: number | string | null | undefined): string => {
     const num = Number(value || 0)
-    return num.toLocaleString('es-AR', { maximumFractionDigits: 6 })
+    return num.toLocaleString('es-AR', { maximumFractionDigits: 2, minimumFractionDigits: 0 })
   }
 
   const date = (value: string | Date | null | undefined): string => {
