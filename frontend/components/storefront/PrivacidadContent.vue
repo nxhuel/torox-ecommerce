@@ -6,13 +6,15 @@
     <p>
       <strong>TOROX Seguridad</strong>
       <br>
-      * Razón social: SARZI WALTER FABIAN
+      * Persona Humana / Titular: SARZI WALTER FABIAN
+      <br>
+      * Actividad Principal: Venta al por menor
       <br>
       * CUIT: 20-21438911-9
       <br>
-      * Domicilio: Madariaga 581, Lanús, Buenos Aires, CP 1824
+      * Domicilio Fiscal: Madariaga 581, Lanús, Buenos Aires, CP 1824
       <br>
-      * Correo electrónico: toroxseguridad@gmail.com
+      * Correo Electrónico: toroxseguridad@gmail.com
     </p>
 
     <h3 class="pt-2">2. Marco Legal</h3>
