@@ -6,7 +6,7 @@
     <p>
       <strong>TOROX Seguridad</strong>
       <br>
-      * Persona Humana / Titular: SARZI WALTER FABIAN
+      * Titular: SARZI WALTER FABIAN
       <br>
       * Actividad Principal: Venta al por menor
       <br>
