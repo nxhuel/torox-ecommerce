@@ -16,15 +16,15 @@ async function bootstrap() {
   // --- Security headers via Helmet ---
   app.use(helmet());
 
-  // Serve uploaded images as static files.
-  app.useStaticAssets(path.resolve(process.cwd(), 'uploads'), { prefix: '/uploads' });
-
+  // Enable CORS before other middleware.
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3001',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
+
+  app.useStaticAssets(path.resolve(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
   app.setGlobalPrefix('api');
 

@@ -13,6 +13,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 3000
 ENV NODE_ENV=production
+ENV PORT=3000
 ENV DATABASE_URL=postgresql://db_xfpxvqaunpi4:PSL8VFmwvKkA5AtreEyeZGkB@up-de-fra1-postgresql-3.db.run-on-seenode.com:11550/db_xfpxvqaunpi4
 ENV DATABASE_SSL=true
 CMD ["node", "dist/main"]
