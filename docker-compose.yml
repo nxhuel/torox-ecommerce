@@ -47,6 +47,10 @@ services:
       JWT_SECRET: torox_super_secret_jwt_key_2024_change_in_production
       JWT_EXPIRES_IN: 7d
       FRONTEND_URL: http://localhost:3001
+      # Cloudinary
+      CLOUDINARY_CLOUD_NAME: hdidotfa
+      CLOUDINARY_API_KEY: 172943417187796
+      CLOUDINARY_API_SECRET: XpW_A6ETly-VxwQHcjea_on_Mbk
     ports:
       - '3000:3000'
     volumes:

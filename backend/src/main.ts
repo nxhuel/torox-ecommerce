@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
 import * as path from 'path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
@@ -11,6 +12,9 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['log', 'error', 'warn', 'debug'],
   });
+
+  // --- Security headers via Helmet ---
+  app.use(helmet());
 
   // Serve uploaded images as static files.
   app.useStaticAssets(path.resolve(process.cwd(), 'uploads'), { prefix: '/uploads' });

@@ -36,7 +36,8 @@ async function submit() {
     toast.success(`¡Hola de nuevo, ${auth.user?.firstName}!`)
     router.push(redirect.value)
   } catch (err: any) {
-    error.value = err.message || 'Credenciales incorrectas'
+    const msg = err?.data?.message || err.message || 'Credenciales incorrectas'
+    error.value = msg
   } finally {
     loading.value = false
   }
