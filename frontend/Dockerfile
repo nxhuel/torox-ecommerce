@@ -6,7 +6,7 @@ WORKDIR /app
 ARG NUXT_PUBLIC_API_BASE
 ENV NUXT_PUBLIC_API_BASE=$NUXT_PUBLIC_API_BASE
 COPY package*.json ./
-RUN npm ci
+RUN corepack disable && npm ci
 COPY . .
 RUN npm run build
 
