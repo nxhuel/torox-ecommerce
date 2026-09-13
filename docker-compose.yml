@@ -24,7 +24,7 @@ services:
       DATABASE_SSL: 'true'
       JWT_SECRET: torox_super_secret_jwt_key_2024_change_in_production
       JWT_EXPIRES_IN: 7d
-      FRONTEND_URL: http://localhost:3001
+      FRONTEND_URL: https://torox-ecommerce-2.seenode.app/
       # Cloudinary
       CLOUDINARY_CLOUD_NAME: hdidotfa
       CLOUDINARY_API_KEY: 172943417187796
