@@ -9,19 +9,19 @@ services:
       NODE_ENV: production
       PORT: 3000
       # ── CONEXIÓN LOCAL (docker compose up --build -d) ──────────────────
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-      DATABASE_NAME: torox_db
-      DATABASE_USER: torox_user
-      DATABASE_PASSWORD: torox_pass_2024
-      DATABASE_SSL: 'false'
+      # DATABASE_HOST: postgres
+      # DATABASE_PORT: 5432
+      # DATABASE_NAME: torox_db
+      # DATABASE_USER: torox_user
+      # DATABASE_PASSWORD: torox_pass_2024
+      # DATABASE_SSL: 'false'
       # ── PRODUCCIÓN (Seenode Postgres) — para uso en producción ──────────
-      # DATABASE_HOST: up-de-fra1-postgresql-3.db.run-on-seenode.com
-      # DATABASE_PORT: 11550
-      # DATABASE_NAME: db_xfpxvqaunpi4
-      # DATABASE_USER: db_xfpxvqaunpi4
-      # DATABASE_PASSWORD: PSL8VFmwvKkA5AtreEyeZGkB
-      # DATABASE_SSL: 'true'
+      DATABASE_HOST: up-de-fra1-postgresql-3.db.run-on-seenode.com
+      DATABASE_PORT: 11550
+      DATABASE_NAME: db_xfpxvqaunpi4
+      DATABASE_USER: db_xfpxvqaunpi4
+      DATABASE_PASSWORD: PSL8VFmwvKkA5AtreEyeZGkB
+      DATABASE_SSL: 'true'
       JWT_SECRET: torox_super_secret_jwt_key_2024_change_in_production
       JWT_EXPIRES_IN: 7d
       FRONTEND_URL: http://localhost:3001
