@@ -38,16 +38,11 @@ import { UploadsModule } from './uploads/uploads.module';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
-        host: config.get('DATABASE_HOST', 'localhost'),
-        port: config.get<number>('DATABASE_PORT', 5432),
-        username: config.get('DATABASE_USER', 'torox_user'),
-        password: config.get('DATABASE_PASSWORD', 'torox_pass_2024'),
-        database: config.get('DATABASE_NAME', 'torox_db'),
+        url: config.get('DATABASE_URL'),
         autoLoadEntities: true,
-        synchronize: true, // Only for dev/demo
+        synchronize: true,
         logging: config.get('NODE_ENV') === 'development',
-        // Render Postgres requires TLS; enable when DATABASE_SSL=true
-        ...(config.get('DATABASE_SSL') === 'true'
+        ...(String(config.get('DATABASE_SSL')) === 'true'
           ? { ssl: { rejectUnauthorized: false } }
           : {}),
       }),
