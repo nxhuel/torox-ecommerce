@@ -51,8 +51,8 @@ async function bootstrap() {
     const port = process.env.PORT || 3000;
     await app.listen(port);
     logger.log(`🚀 TOROX API running on http://localhost:${port}/api`);
-  } catch (error) {
-    logger.error('Failed to start application', error.stack);
+  } catch (error: unknown) {
+    logger.error('Failed to start application', (error as Error).stack);
     process.exit(1);
   }
 }
