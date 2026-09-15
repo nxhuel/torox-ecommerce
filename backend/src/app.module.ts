@@ -16,7 +16,6 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { FinanceModule } from './finance/finance.module';
 import { DashboardModule } from './dashboard/dashboard.module';
-import { SeedModule } from './database/seed/seed.module';
 import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
@@ -61,7 +60,6 @@ import { UploadsModule } from './uploads/uploads.module';
     PromotionsModule,
     FinanceModule,
     DashboardModule,
-    SeedModule,
     UploadsModule,
   ],
   providers: [

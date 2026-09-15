@@ -132,14 +132,21 @@ export class OrdersService {
     return this.getOrderDetail(saved.id);
   }
 
-  async findAll(query: { status?: string; search?: string; page?: number; limit?: number }) {
-    const { status, search, page = 1, limit = 10 } = query;
+  async findAll(query: {
+    status?: string;
+    search?: string;
+    userId?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, search, userId, page = 1, limit = 10 } = query;
     const qb = this.orderRepo.createQueryBuilder('o')
       .orderBy('o.created_at', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
     if (status) qb.andWhere('o.status = :status', { status });
+    if (userId) qb.andWhere('o.user_id = :userId', { userId });
     if (search) {
       qb.andWhere(
         '(o.customer_name ILIKE :search OR o.customer_email ILIKE :search OR o.order_number ILIKE :search)',

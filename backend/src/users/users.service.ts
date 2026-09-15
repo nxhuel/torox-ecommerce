@@ -1,10 +1,15 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole, UserStatus } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Order } from '../orders/entities/order.entity';
+import { Payment } from '../payments/entities/payment.entity';
+import { Shipment } from '../shipments/entities/shipment.entity';
+import { Cart } from '../cart/entities/cart.entity';
+import { FinanceMovement } from '../finance/entities/finance-movement.entity';
 
 @Injectable()
 export class UsersService {
@@ -47,7 +52,28 @@ export class UsersService {
 
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
-    await this.userRepo.remove(user);
+
+    await this.userRepo.manager.transaction(async (manager) => {
+      const orders = await manager.find(Order, {
+        where: { userId: user.id },
+        select: { id: true },
+      });
+      const orderIds = orders.map((order) => order.id);
+
+      if (orderIds.length) {
+        // Payments and shipments reference the order without ON DELETE, so they
+        // have to go first. order_items cascades with its order.
+        await manager.delete(Payment, { orderId: In(orderIds) });
+        await manager.delete(Shipment, { orderId: In(orderIds) });
+        await manager.delete(FinanceMovement, { referenceId: In(orderIds) });
+        await manager.delete(Order, { id: In(orderIds) });
+      }
+
+      // carts.user_id also blocks the delete; cart_items cascades with the cart.
+      // favorites and notifications already cascade on user delete.
+      await manager.delete(Cart, { userId: user.id });
+      await manager.delete(User, { id: user.id });
+    });
   }
 
   async validatePassword(user: User, password: string): Promise<boolean> {

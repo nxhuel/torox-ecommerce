@@ -120,7 +120,7 @@ export const ordersService = {
     api().api<Order>('/orders', { method: 'POST', body: data }),
   mine: () => api().api<Order[]>('/orders/mine'),
   get: (id: string) => api().api<Order>(`/orders/${id}`),
-  all: (query: { status?: string; search?: string; page?: number; limit?: number } = {}) =>
+  all: (query: { status?: string; search?: string; userId?: string; page?: number; limit?: number } = {}) =>
     api().list<Order>(
       `/orders?${new URLSearchParams(
         Object.entries(query).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]),

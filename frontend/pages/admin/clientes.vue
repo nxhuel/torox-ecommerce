@@ -40,10 +40,11 @@ const filtered = computed(() => {
 
 async function openDetail(customer: User) {
   selected.value = customer
+  selectedOrders.value = []
   detailLoading.value = true
   try {
-    const all = await ordersService.mine().catch(() => [])
-    selectedOrders.value = all.filter((o) => o.userId === customer.id)
+    const result = await ordersService.all({ userId: customer.id, limit: 100 })
+    selectedOrders.value = result.items
   } catch {
     selectedOrders.value = []
   } finally {
@@ -52,7 +53,12 @@ async function openDetail(customer: User) {
 }
 
 async function removeCustomer(customer: User, closeModal = false) {
-  if (!confirm(`¿Eliminar al cliente "${customer.firstName} ${customer.lastName}"?\n\nEsta acción no se puede deshacer.`)) return
+  if (
+    !confirm(
+      `¿Eliminar al cliente "${customer.firstName} ${customer.lastName}"?\n\nSe van a borrar también sus pedidos, pagos y movimientos financieros. Esta acción no se puede deshacer.`,
+    )
+  )
+    return
   deleting.value = customer.id
   try {
     await usersService.remove(customer.id)
@@ -66,10 +72,12 @@ async function removeCustomer(customer: User, closeModal = false) {
   }
 }
 
+const paidOrders = computed(() =>
+  selectedOrders.value.filter((o) => !['CANCELLED', 'PENDING_PAYMENT'].includes(o.status)),
+)
+
 const totalSpent = computed(() =>
-  selectedOrders.value
-    .filter((o) => !['CANCELLED', 'PENDING_PAYMENT'].includes(o.status))
-    .reduce((sum, o) => sum + Number(o.total), 0),
+  paidOrders.value.reduce((sum, o) => sum + Number(o.total), 0),
 )
 </script>
 
@@ -177,7 +185,7 @@ const totalSpent = computed(() =>
 
         <div class="mt-4 grid grid-cols-2 gap-4">
           <div class="rounded-xl border border-brand-100 bg-brand-50 p-4 text-center">
-            <p class="text-2xl font-extrabold text-brand-700">{{ selectedOrders.length }}</p>
+            <p class="text-2xl font-extrabold text-brand-700">{{ paidOrders.length }}</p>
             <p class="text-xs font-medium text-brand-800">Compras</p>
           </div>
           <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center">
