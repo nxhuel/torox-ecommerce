@@ -17,11 +17,15 @@ async function bootstrap() {
     // --- Security headers via Helmet ---
     app.use(helmet());
 
-    // Enable CORS - accept any *.seenode.app origin.
-    const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:3001';
+    // Enable CORS - accept the configured frontend origin(s) plus any *.seenode.app origin.
+    // FRONTEND_URL accepts a comma-separated list, e.g. "https://torox.com.ar,https://www.torox.com.ar".
+    const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3001')
+      .split(',')
+      .map((value) => value.trim().replace(/\/+$/, ''))
+      .filter(Boolean);
     app.enableCors({
       origin: (origin, callback) => {
-        if (!origin || origin.includes(allowedOrigin) || origin.endsWith('.seenode.app')) {
+        if (!origin || origin.endsWith('.seenode.app') || allowedOrigins.includes(origin.replace(/\/+$/, ''))) {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
