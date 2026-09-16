@@ -29,6 +29,8 @@ services:
       CLOUDINARY_CLOUD_NAME: hdidotfa
       CLOUDINARY_API_KEY: 172943417187796
       CLOUDINARY_API_SECRET: XpW_A6ETly-VxwQHcjea_on_Mbk
+      RESEND_API_KEY: re_eghKDyoR_E6J2BGrpP1bQe2gmJ8aTv4vw
+      MAIL_FROM: 'Torox <toroxseguridad@gmail.com>'
     ports:
       - '3000:3000'
     volumes:

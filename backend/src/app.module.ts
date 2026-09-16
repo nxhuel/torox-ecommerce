@@ -17,6 +17,7 @@ import { PromotionsModule } from './promotions/promotions.module';
 import { FinanceModule } from './finance/finance.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { UploadsModule } from './uploads/uploads.module';
     FinanceModule,
     DashboardModule,
     UploadsModule,
+    MailModule,
   ],
   providers: [
     {

@@ -18,6 +18,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
 import { FinanceService } from '../finance/finance.service';
 import { PromotionsService } from '../promotions/promotions.service';
+import { MailService } from '../mail/mail.service';
 
 const FREE_SHIPPING_THRESHOLD = 50000;
 const SHIPPING_COST = 3500;
@@ -34,6 +35,7 @@ export class OrdersService {
     private readonly notificationsService: NotificationsService,
     private readonly financeService: FinanceService,
     private readonly promotionsService: PromotionsService,
+    private readonly mailService: MailService,
   ) {}
 
   async createFromCart(dto: CreateOrderDto, userId?: string) {
@@ -127,6 +129,7 @@ export class OrdersService {
         `Tu pedido ${saved.orderNumber} quedó registrado. Estamos esperando la confirmación del pago de $${total.toLocaleString('es-AR')}.`,
         `/pedidos/${saved.id}`,
       );
+      await this.mailService.sendOrderConfirmation(saved.customerEmail, saved.orderNumber, total);
     }
 
     return this.getOrderDetail(saved.id);
@@ -259,6 +262,7 @@ export class OrdersService {
         `Tu pedido ${order.orderNumber} fue despachado. Código de seguimiento: ${shipment.trackingNumber}`,
         `/pedidos/${order.id}`,
       );
+      await this.mailService.sendShipmentStatus(order.customerEmail, order.orderNumber, shipment.trackingNumber);
     }
 
     if (target === OrderStatus.DELIVERED) {
@@ -276,6 +280,7 @@ export class OrdersService {
         `Tu pedido ${order.orderNumber} fue entregado. ¡Gracias por comprar en TOROX!`,
         `/pedidos/${order.id}`,
       );
+      await this.mailService.sendOrderDelivered(order.customerEmail, order.orderNumber);
     }
 
     order.status = target;
@@ -313,6 +318,8 @@ export class OrdersService {
       'Tu envío fue generado en Andreani y está en preparación.',
       `/pedidos/${order.id}`,
     );
+    await this.mailService.sendPaymentApproved(order.customerEmail, order.orderNumber, order.total);
+    await this.mailService.sendOrderConfirmation(order.customerEmail, order.orderNumber, order.total);
   }
 
   private async handlePaymentRejected(orderId: string, _payment: Payment, reason?: string) {
@@ -328,6 +335,7 @@ export class OrdersService {
       reason || 'No pudimos procesar el pago de tu pedido. Podés volver a intentarlo.',
       `/pedidos/${order.id}`,
     );
+    await this.mailService.sendPaymentRejected(order.customerEmail, order.orderNumber, reason || 'Pago no procesado');
   }
 
   private async cancelOrder(order: Order, reason?: string) {

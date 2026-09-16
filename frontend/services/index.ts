@@ -33,6 +33,16 @@ export const authService = {
       method: 'POST',
       body: data,
     }),
+  forgotPassword: (email: string) =>
+    api().api<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: { email },
+    }),
+  resetPassword: (token: string, password: string) =>
+    api().api<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: { token, password },
+    }),
   me: () => api().api<User>('/auth/me'),
 }
 

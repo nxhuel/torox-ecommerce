@@ -11,9 +11,11 @@ import { ShipmentsModule } from '../shipments/shipments.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { FinanceModule } from '../finance/finance.module';
 import { PromotionsModule } from '../promotions/promotions.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
+    MailModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     TypeOrmModule.forFeature([Order, OrderItem]),
     CartModule,
