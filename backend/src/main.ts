@@ -25,7 +25,7 @@ async function bootstrap() {
       .filter(Boolean);
     app.enableCors({
       origin: (origin, callback) => {
-        if (!origin || origin.endsWith('.seenode.app') || allowedOrigins.includes(origin.replace(/\/+$/, ''))) {
+        if (!origin || origin.endsWith('.com.ar') || allowedOrigins.includes(origin.replace(/\/+$/, ''))) {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
