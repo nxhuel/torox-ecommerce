@@ -9,7 +9,7 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = configService.get<string>('RESEND_API_KEY') || process.env.RESEND_API_KEY || '';
+    const apiKey = configService.get<string>('RESEND_API_KEY') || process.env.RESEND_API_KEY || 're_eghKDyoR_E6J2BGrpP1bQe2gmJ8aTv4vw';
     this.resend = apiKey.startsWith('re_') ? new Resend(apiKey) : undefined;
     this.from = configService.get<string>('MAIL_FROM') || process.env.MAIL_FROM || 'toroxseguridad@gmail.com';
   }
