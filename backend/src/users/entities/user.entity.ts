@@ -49,6 +49,23 @@ export class User {
   @Column({ nullable: true, name: 'avatar_url' })
   avatarUrl: string;
 
+  // --- Password reset code -------------------------------------------------
+  // These are `select: false` so they never come back from a normal query and
+  // leak through /auth/me or /users. UsersService.findResetCode() reads them
+  // explicitly when the reset flow needs them.
+
+  @Column({ nullable: true, name: 'reset_code_hash', select: false })
+  @Exclude()
+  resetCodeHash: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'reset_code_expires_at', select: false })
+  @Exclude()
+  resetCodeExpiresAt: Date | null;
+
+  @Column({ type: 'int', default: 0, name: 'reset_code_attempts', select: false })
+  @Exclude()
+  resetCodeAttempts: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

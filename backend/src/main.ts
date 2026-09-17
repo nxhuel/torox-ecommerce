@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, Logger, ClassSerializerInterceptor } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import * as path from 'path';
@@ -50,7 +51,14 @@ async function bootstrap() {
     );
 
     app.useGlobalFilters(new HttpExceptionFilter());
-    app.useGlobalInterceptors(new TransformInterceptor());
+    // ClassSerializerInterceptor must wrap TransformInterceptor so that @Exclude()
+    // (e.g. User.password, the reset-code fields) is applied to the final payload.
+    // Without it @Exclude() is a no-op and the password hash leaks from /auth/me
+    // and /users.
+    app.useGlobalInterceptors(
+      new ClassSerializerInterceptor(app.get(Reflector)),
+      new TransformInterceptor(),
+    );
 
     const port = process.env.PORT || 3000;
     await app.listen(port);

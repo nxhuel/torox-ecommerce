@@ -80,6 +80,41 @@ export class UsersService {
     return bcrypt.compare(password, user.password);
   }
 
+  /** Stores a fresh password reset code, invalidating any previous one. */
+  async setResetCode(userId: string, codeHash: string, expiresAt: Date): Promise<void> {
+    await this.userRepo.update(userId, {
+      resetCodeHash: codeHash,
+      resetCodeExpiresAt: expiresAt,
+      resetCodeAttempts: 0,
+    });
+  }
+
+  /**
+   * Reads the reset-code fields, which are excluded from normal selects so they
+   * never leak through /auth/me or /users.
+   */
+  async findResetCode(userId: string): Promise<User | null> {
+    return this.userRepo
+      .createQueryBuilder('user')
+      .addSelect(['user.resetCodeHash', 'user.resetCodeExpiresAt', 'user.resetCodeAttempts'])
+      .where('user.id = :userId', { userId })
+      .getOne();
+  }
+
+  /** Counts a wrong code so brute-force attempts can be capped. */
+  async countFailedResetAttempt(userId: string): Promise<void> {
+    await this.userRepo.increment({ id: userId }, 'resetCodeAttempts', 1);
+  }
+
+  /** Removes the reset code once it is used, expired or abused. */
+  async clearResetCode(userId: string): Promise<void> {
+    await this.userRepo.update(userId, {
+      resetCodeHash: null,
+      resetCodeExpiresAt: null,
+      resetCodeAttempts: 0,
+    });
+  }
+
   async getCustomerStats(userId: string) {
     return { userId };
   }

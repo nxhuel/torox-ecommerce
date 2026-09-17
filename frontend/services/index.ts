@@ -38,6 +38,11 @@ export const authService = {
       method: 'POST',
       body: { email },
     }),
+  verifyResetCode: (email: string, code: string) =>
+    api().api<{ resetToken: string }>('/auth/verify-reset-code', {
+      method: 'POST',
+      body: { email, code },
+    }),
   resetPassword: (token: string, password: string) =>
     api().api<{ message: string }>('/auth/reset-password', {
       method: 'POST',

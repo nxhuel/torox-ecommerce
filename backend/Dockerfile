@@ -16,6 +16,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV RESEND_API_KEY=re_eghKDyoR_E6J2BGrpP1bQe2gmJ8aTv4vw
 ENV MAIL_FROM="TOROX <no-reply@torox.com.ar>"
+ENV MAIL_REPLY_TO=toroxseguridad@gmail.com
 ENV DATABASE_URL=postgresql://db_xfpxvqaunpi4:PSL8VFmwvKkA5AtreEyeZGkB@up-de-fra1-postgresql-3.db.run-on-seenode.com:11550/db_xfpxvqaunpi4
 ENV DATABASE_SSL=true
 CMD ["node", "dist/main"]
