@@ -9,10 +9,10 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = configService.get<string>('RESEND_API_KEY');
+    const apiKey = configService.get<string>('RESEND_API_KEY') || process.env.RESEND_API_KEY;
     if (!apiKey) throw new Error('RESEND_API_KEY is not defined');
     this.resend = new Resend(apiKey);
-    this.from = configService.get<string>('MAIL_FROM') || 'toroxseguridad@gmail.com';
+    this.from = configService.get<string>('MAIL_FROM') || process.env.MAIL_FROM || 'toroxseguridad@gmail.com';
   }
 
   async sendOrderConfirmation(email: string, orderNumber: string, total: number): Promise<void> {
