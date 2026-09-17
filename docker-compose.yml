@@ -24,13 +24,13 @@ services:
       DATABASE_SSL: 'true'
       JWT_SECRET: torox_super_secret_jwt_key_2024_change_in_production
       JWT_EXPIRES_IN: 7d
-      FRONTEND_URL: https://torox.com.ar/
+      FRONTEND_URL: https://torox.com.ar
       # Cloudinary
       CLOUDINARY_CLOUD_NAME: hdidotfa
       CLOUDINARY_API_KEY: 172943417187796
       CLOUDINARY_API_SECRET: XpW_A6ETly-VxwQHcjea_on_Mbk
       RESEND_API_KEY: re_eghKDyoR_E6J2BGrpP1bQe2gmJ8aTv4vw
-      MAIL_FROM: toroxseguridad@gmail.com
+      MAIL_FROM: TOROX <no-reply@torox.com.ar>
     ports:
       - '3000:3000'
     volumes:

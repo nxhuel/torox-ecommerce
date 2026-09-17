@@ -11,7 +11,9 @@ export class MailService {
   constructor(private readonly configService: ConfigService) {
     const apiKey = configService.get<string>('RESEND_API_KEY') || process.env.RESEND_API_KEY || 're_eghKDyoR_E6J2BGrpP1bQe2gmJ8aTv4vw';
     this.resend = apiKey.startsWith('re_') ? new Resend(apiKey) : undefined;
-    this.from = configService.get<string>('MAIL_FROM') || process.env.MAIL_FROM || 'toroxseguridad@gmail.com';
+    // Resend only accepts senders from a domain verified in the account, so this
+    // must be an address at torox.com.ar (not a free mailbox provider).
+    this.from = configService.get<string>('MAIL_FROM') || process.env.MAIL_FROM || 'TOROX <no-reply@torox.com.ar>';
   }
 
   private async sendEmailInternal(email: string, subject: string, html: string): Promise<void> {
@@ -20,8 +22,17 @@ export class MailService {
       return;
     }
     try {
-      await this.resend.emails.send({ from: this.from, to: email, subject, html });
-      this.logger.log(`Email sent to ${email}: ${subject}`);
+      const { data, error } = await this.resend.emails.send({ from: this.from, to: email, subject, html });
+      // The Resend SDK resolves with { data, error } instead of throwing on API
+      // errors (unverified sender domain, revoked API key, ...). Ignoring the
+      // error here would silently drop every mail while still reporting success.
+      if (error) {
+        this.logger.error(
+          `Failed to send email to ${email}: [${error.name}] ${error.message} (from: ${this.from})`,
+        );
+        return;
+      }
+      this.logger.log(`Email sent to ${email} (id: ${data?.id}): ${subject}`);
     } catch (error: any) {
       this.logger.error(`Failed to send email to ${email}: ${error.message}`);
     }
@@ -83,7 +94,11 @@ export class MailService {
   }
 
   async sendPasswordReset(email: string, resetToken: string): Promise<void> {
-    const resetUrl = `${this.configService.get<string>('FRONTEND_URL', 'https://torox.com.ar')}/auth/reset-password?token=${resetToken}`;
+    const baseUrl = (this.configService.get<string>('FRONTEND_URL') || 'https://torox.com.ar')
+      .split(',')[0]
+      .trim()
+      .replace(/\/+$/, '');
+    const resetUrl = `${baseUrl}/auth/reset-password?token=${encodeURIComponent(resetToken)}`;
     await this.sendEmailInternal(email, 'Recuperá tu contraseña - TOROX', `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h1 style="color: #2563eb;">Recuperá tu contraseña</h1>
