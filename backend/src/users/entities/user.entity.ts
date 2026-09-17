@@ -54,7 +54,17 @@ export class User {
   // leak through /auth/me or /users. UsersService.findResetCode() reads them
   // explicitly when the reset flow needs them.
 
-  @Column({ nullable: true, name: 'reset_code_hash', select: false })
+  /**
+   * bcrypt.hash(code, 10) produces a string longer than 60 chars, so TEXT is the
+   * natural fit. TypeORM needs an explicit type here because a bare string column
+   * defaults to `Object`, which Postgres doesn't support.
+   */
+  @Column({
+    type: 'text',
+    nullable: true,
+    name: 'reset_code_hash',
+    select: false,
+  })
   @Exclude()
   resetCodeHash: string | null;
 
