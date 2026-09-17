@@ -30,7 +30,7 @@ services:
       CLOUDINARY_API_KEY: 172943417187796
       CLOUDINARY_API_SECRET: XpW_A6ETly-VxwQHcjea_on_Mbk
       RESEND_API_KEY: re_eghKDyoR_E6J2BGrpP1bQe2gmJ8aTv4vw
-      MAIL_FROM: TOROX <no-reply@torox.com.ar>
+      MAIL_FROM: "TOROX <no-reply@torox.com.ar>"
     ports:
       - '3000:3000'
     volumes:
@@ -51,5 +51,6 @@ services:
       # NUXT_PUBLIC_API_BASE_SERVER: http://backend:3000/api
     ports:
       - '3001:3000'
-    volumes:
-      - backend_uploads:
+
+volumes:
+  backend_uploads:
