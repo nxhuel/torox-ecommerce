@@ -83,7 +83,7 @@ export class MailService {
   }
 
   async sendPasswordReset(email: string, resetToken: string): Promise<void> {
-    const resetUrl = `${this.configService.get<string>('FRONTEND_URL', 'https://torox.com.ar')}/auth/recuperar?token=${resetToken}`;
+    const resetUrl = `${this.configService.get<string>('FRONTEND_URL', 'https://torox.com.ar')}/auth/reset-password?token=${resetToken}`;
     await this.sendEmailInternal(email, 'Recuperá tu contraseña - TOROX', `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h1 style="color: #2563eb;">Recuperá tu contraseña</h1>

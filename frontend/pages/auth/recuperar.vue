@@ -6,6 +6,7 @@ import authImg from '~/assets/fondo-auth.png'
 import { useToast } from '~/composables/useToast'
 import { authService } from '~/services'
 
+const toast = useToast()
 const email = ref('')
 const loading = ref(false)
 const error = ref('')
