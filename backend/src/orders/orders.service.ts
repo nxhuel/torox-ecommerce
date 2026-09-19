@@ -1,11 +1,11 @@
-import {
-  Injectable,
+import { Injectable,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Order, OrderItem, OrderStatus, ShippingMethod } from './entities/order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -36,6 +36,7 @@ export class OrdersService {
     private readonly financeService: FinanceService,
     private readonly promotionsService: PromotionsService,
     private readonly mailService: MailService,
+    private readonly config: ConfigService,
   ) {}
 
   async createFromCart(dto: CreateOrderDto, userId?: string) {
@@ -221,6 +222,84 @@ export class OrdersService {
     const rejected = await this.paymentsService.reject(payment.id, reason);
     await this.handlePaymentRejected(orderId, rejected, reason);
     return this.getOrderDetail(orderId);
+  }
+
+  async startMercadoPagoPayment(orderId: string, paymentData: { customerEmail: string; customerName?: string; customerPhone?: string }) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId }, relations: { items: true } });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    if (order.status !== OrderStatus.PENDING_PAYMENT) {
+      throw new BadRequestException('El pedido no está en estado PENDING_PAYMENT');
+    }
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    
+    // Create preference via MercadoPago service
+    const result = await this.paymentsService.createMercadoPagoPreference({
+      orderId,
+      amount: Number(order.total),
+      items: order.items.map(i => ({
+        id: i.productId,
+        name: i.name,
+        image: i.image,
+        quantity: i.quantity,
+        unitPrice: Number(i.unitPrice),
+      })),
+      customer: {
+        email: paymentData.customerEmail,
+        name: paymentData.customerName,
+        phone: paymentData.customerPhone,
+      },
+      shippingAddress: order.shippingAddress ? {
+        province: order.shippingAddress.province,
+        city: order.shippingAddress.city,
+        postalCode: order.shippingAddress.postalCode,
+        address: order.shippingAddress.address,
+        number: order.shippingAddress.number,
+      } : undefined,
+      successUrl: `${frontendUrl}/checkout/success?orderId=${orderId}`,
+      failureUrl: `${frontendUrl}/checkout/failure?orderId=${orderId}`,
+      pendingUrl: `${frontendUrl}/checkout/pending?orderId=${orderId}`,
+    });
+
+    return {
+      preferenceId: result.preferenceId,
+      initPoint: result.initPoint,
+      orderId: orderId,
+    };
+  }
+
+  async getMercadoPagoRedirectUrl(orderId: string) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    if (order.status !== OrderStatus.PENDING_PAYMENT) {
+      throw new BadRequestException('El pedido no está en estado PENDING_PAYMENT');
+    }
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const result = await this.paymentsService.createMercadoPagoPreference({
+      orderId,
+      amount: Number(order.total),
+      items: order.items.map(i => ({
+        id: i.productId,
+        name: i.name,
+        image: i.image,
+        quantity: i.quantity,
+        unitPrice: Number(i.unitPrice),
+      })),
+      customer: { email: order.customerEmail, name: order.customerName, phone: order.customerPhone },
+      shippingAddress: order.shippingAddress ? {
+        province: order.shippingAddress.province,
+        city: order.shippingAddress.city,
+        postalCode: order.shippingAddress.postalCode,
+        address: order.shippingAddress.address,
+        number: order.shippingAddress.number,
+      } : undefined,
+      successUrl: `${frontendUrl}/checkout/success?orderId=${orderId}`,
+      failureUrl: `${frontendUrl}/checkout/failure?orderId=${orderId}`,
+      pendingUrl: `${frontendUrl}/checkout/pending?orderId=${orderId}`,
+    });
+
+    return { url: result.initPoint, preferenceId: result.preferenceId };
   }
 
   async updateStatus(orderId: string, dto: UpdateOrderStatusDto) {

@@ -89,4 +89,16 @@ export class OrdersController {
       notes: body?.reason,
     });
   }
+
+  @Post(':id/start-mercado-pago')
+  @UseGuards(OptionalJwtAuthGuard)
+  startMercadoPago(@Param('id') id: string, @Body() body: { customerEmail: string; customerName?: string; customerPhone?: string }) {
+    return this.service.startMercadoPagoPayment(id, body);
+  }
+
+  @Get(':id/mercado-pago-url')
+  @UseGuards(OptionalJwtAuthGuard)
+  getMercadoPagoUrl(@Param('id') id: string) {
+    return this.service.getMercadoPagoRedirectUrl(id);
+  }
 }

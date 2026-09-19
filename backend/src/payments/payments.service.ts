@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment, PaymentMethod as PaymentMethodEntity, PaymentStatus } from './entities/payment.entity';
 import { PAYMENT_PROVIDER, PaymentProvider, PaymentMethod } from './providers/payment-provider.interface';
+import { MercadoPagoService } from './mercado-pago.service';
 
 export interface CreatePaymentData {
   method: PaymentMethod;
@@ -12,6 +13,38 @@ export interface CreatePaymentData {
   cardCvc?: string;
 }
 
+export interface CreateMercadoPagoPreferenceInput {
+  orderId: string;
+  amount: number;
+  items: Array<{
+    id: string;
+    name: string;
+    image?: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  customer: {
+    email: string;
+    name?: string;
+    phone?: string;
+  };
+  shippingAddress: {
+    province: string;
+    city: string;
+    postalCode: string;
+    address: string;
+    number?: string;
+  } | undefined;
+  successUrl: string;
+  failureUrl: string;
+  pendingUrl: string;
+}
+
+export interface CreateMercadoPagoPreferenceResult {
+  preferenceId: number;
+  initPoint: string;
+}
+
 @Injectable()
 export class PaymentsService {
   constructor(
@@ -19,6 +52,7 @@ export class PaymentsService {
     private readonly repo: Repository<Payment>,
     @Inject(PAYMENT_PROVIDER)
     private readonly provider: PaymentProvider,
+    private readonly mercadoPagoService: MercadoPagoService,
   ) {}
 
   async createPayment(orderId: string, amount: number, data: CreatePaymentData): Promise<Payment> {
@@ -76,5 +110,18 @@ export class PaymentsService {
 
   async findAll(): Promise<Payment[]> {
     return this.repo.find({ order: { createdAt: 'DESC' }, relations: { order: true } });
+  }
+
+  async createMercadoPagoPreference(input: CreateMercadoPagoPreferenceInput): Promise<CreateMercadoPagoPreferenceResult> {
+    return this.mercadoPagoService.createPreference(
+      input.orderId,
+      input.amount,
+      input.items,
+      input.customer,
+      input.shippingAddress,
+      input.successUrl,
+      input.failureUrl,
+      input.pendingUrl,
+    );
   }
 }

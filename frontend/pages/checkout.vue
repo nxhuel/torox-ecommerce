@@ -10,6 +10,7 @@ import {
   Building,
   Home,
   Landmark,
+  ExternalLink,
 } from 'lucide-vue-next'
 import { useCartStore } from '~/stores/cart'
 import { useAuthStore } from '~/stores/auth'
@@ -25,6 +26,7 @@ const toast = useToast()
 const step = ref(1)
 const processing = ref(false)
 const error = ref('')
+const redirectingToMp = ref(false)
 
 const form = reactive({
   customerName: '',
@@ -38,7 +40,6 @@ const form = reactive({
   apartment: '',
   references: '',
   shippingMethod: 'HOME_DELIVERY' as 'HOME_DELIVERY' | 'PICKUP',
-  paymentMethod: 'CREDIT_CARD' as 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER',
   cardNumber: '',
   cardHolder: '',
   cardExpiry: '',
@@ -93,16 +94,6 @@ const steps = [
   { number: 4, label: 'Pago', icon: CreditCard },
 ]
 
-const cardBrand = computed(() => {
-  const digits = form.cardNumber.replace(/\D/g, '')
-  if (/^(34|37)/.test(digits)) return { name: 'American Express', short: 'AMEX', color: 'bg-blue-700' }
-  if (/^5[1-5]/.test(digits)) return { name: 'Mastercard', short: 'MC', color: 'bg-orange-600' }
-  if (/^4/.test(digits)) return { name: 'Visa', short: 'VISA', color: 'bg-blue-500' }
-  if (/^(60|62)/.test(digits)) return { name: 'Cabal', short: 'CABAL', color: 'bg-purple-600' }
-  if (/^6/.test(digits)) return { name: 'Maestro', short: 'MAESTRO', color: 'bg-red-500' }
-  return null
-})
-
 const freeShipping = computed(() => {
   const subtotal = cart.cart?.subtotal || 0
   return subtotal >= (cart.cart?.freeShippingThreshold || 50000)
@@ -116,19 +107,6 @@ const shippingCost = computed(() => {
 
 // El total lo calcula el backend: subtotal + shippingCost (el descuento ya está aplicado en el subtotal)
 const total = computed(() => (cart.cart?.total || 0))
-
-function formatCardNumber() {
-  const digits = form.cardNumber.replace(/\D/g, '').slice(0, 16)
-  form.cardNumber = digits.replace(/(.{4})/g, '$1 ').trim()
-}
-
-function formatExpiry() {
-  let digits = form.cardExpiry.replace(/\D/g, '').slice(0, 4)
-  if (digits.length >= 3) {
-    digits = `${digits.slice(0, 2)}/${digits.slice(2)}`
-  }
-  form.cardExpiry = digits
-}
 
 function validateStep(current: number): boolean {
   error.value = ''
@@ -178,7 +156,7 @@ function next() {
   if (step.value < 4) {
     step.value += 1
   } else {
-    placeOrder()
+    placeOrderWithMercadoPago()
   }
 }
 
@@ -186,10 +164,13 @@ function back() {
   if (step.value > 1) step.value -= 1
 }
 
-async function placeOrder() {
+async function placeOrderWithMercadoPago() {
   processing.value = true
   error.value = ''
+  redirectingToMp.value = false
+  
   try {
+    // First, create the order via API
     const order = await ordersService.create({
       customerName: form.customerName.trim(),
       customerEmail: form.customerEmail.trim(),
@@ -204,13 +185,6 @@ async function placeOrder() {
         references: form.references.trim() || undefined,
       },
       shippingMethod: form.shippingMethod,
-      payment: {
-        method: form.paymentMethod,
-        cardNumber: form.cardNumber.replace(/\s/g, ''),
-        cardHolder: form.cardHolder,
-        cardExpiry: form.cardExpiry,
-        cardCvc: form.cardCvc,
-      },
       cartSessionId: auth.isAuthenticated ? undefined : cart.session(),
     })
 
@@ -219,9 +193,33 @@ async function placeOrder() {
       sessionStorage.setItem('torox_last_order', JSON.stringify(order))
     }
     await cart.refresh()
-    router.push(`/pedidos/${order.id}`)
+
+    // Now create the MercadoPago preference
+    const mpResult = await $fetch<{ preferenceId: number; initPoint: string }>(
+      '/api/payments/mercadopago/create-preference',
+      {
+        method: 'POST',
+        body: {
+          orderId: order.id,
+          customerEmail: form.customerEmail.trim(),
+          customerName: form.customerName.trim(),
+          customerPhone: form.customerPhone.trim(),
+          shippingAddress: {
+            province: form.province,
+            city: form.city.trim(),
+            postalCode: form.postalCode.trim(),
+            address: form.address.trim(),
+            number: form.number.trim(),
+          },
+        },
+      }
+    )
+
+    // Redirect to MercadoPago checkout
+    window.location.href = mpResult.initPoint
+    redirectingToMp.value = true
   } catch (err: any) {
-    error.value = err.message || 'No se pudo procesar el pedido. Intentalo de nuevo.'
+    error.value = err.message || 'No se pudo iniciar el pago. Intentalo de nuevo.'
     toast.error(error.value)
   } finally {
     processing.value = false
@@ -359,87 +357,52 @@ async function placeOrder() {
         <!-- Step 4: Payment -->
         <div v-if="step === 4" class="card animate-fade-in-up p-6">
           <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            <CreditCard class="h-4 w-4" /> Pago simulado — Mercado Pago
+            <CreditCard class="h-4 w-4" /> Mercado Pago Checkout Pro
           </div>
-          <h2 class="mb-5 text-lg font-bold text-slate-900">Método de pago</h2>
+          <h2 class="mb-5 text-lg font-bold text-slate-900">Pagar con Mercado Pago</h2>
 
-          <div class="grid gap-3 grid-cols-1 sm:grid-cols-3">
-            <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition"
-              :class="form.paymentMethod === 'CREDIT_CARD' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'">
-              <input v-model="form.paymentMethod" type="radio" value="CREDIT_CARD" class="h-4 w-4 text-brand-600" />
-              <span class="text-sm font-semibold text-slate-800">Tarjeta de crédito</span>
-            </label>
-            <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition"
-              :class="form.paymentMethod === 'DEBIT_CARD' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'">
-              <input v-model="form.paymentMethod" type="radio" value="DEBIT_CARD" class="h-4 w-4 text-brand-600" />
-              <span class="text-sm font-semibold text-slate-800">Tarjeta de débito</span>
-            </label>
-            <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition"
-              :class="form.paymentMethod === 'BANK_TRANSFER' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'">
-              <input v-model="form.paymentMethod" type="radio" value="BANK_TRANSFER" class="h-4 w-4 text-brand-600" />
-              <span class="text-sm font-semibold text-slate-800">Transferencia</span>
-            </label>
-          </div>
+          <div v-if="!redirectingToMp" class="space-y-6">
+            <p class="text-slate-600">
+              Al confirmar, serás redirigido al checkout de Mercado Pago para completar tu pago de forma segura.
+              Todos los métodos de pago aceptados por Mercado Pago están disponibles.
+            </p>
 
-          <template v-if="form.paymentMethod !== 'BANK_TRANSFER'">
-            <div class="mt-6 grid gap-4 sm:grid-cols-2">
-              <div class="sm:col-span-2">
-                <label class="label-base" for="cardNumber">Número de tarjeta *</label>
-                <div class="relative">
-                  <input id="cardNumber" v-model="form.cardNumber" class="input-base !pr-24 font-mono"
-                    placeholder="1234 5678 9012 3456" inputmode="numeric" @input="formatCardNumber" />
-                  <span v-if="cardBrand"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 rounded px-2 py-0.5 text-[10px] font-black text-white"
-                    :class="cardBrand.color">
-                    {{ cardBrand.short }}
-                  </span>
-                </div>
-                <p v-if="cardBrand" class="mt-1 text-xs text-slate-500">Tarjeta {{ cardBrand.name }} detectada</p>
-              </div>
-              <div class="sm:col-span-2">
-                <label class="label-base" for="cardHolder">Titular de la tarjeta *</label>
-                <input id="cardHolder" v-model="form.cardHolder" class="input-base"
-                  placeholder="Como figura en la tarjeta" />
-              </div>
-              <div>
-                <label class="label-base" for="cardExpiry">Vencimiento *</label>
-                <input id="cardExpiry" v-model="form.cardExpiry" class="input-base font-mono" placeholder="MM/AA"
-                  inputmode="numeric" @input="formatExpiry" />
-              </div>
-              <div>
-                <label class="label-base" for="cardCvc">Código de seguridad *</label>
-                <input id="cardCvc" v-model="form.cardCvc" class="input-base font-mono" placeholder="123"
-                  inputmode="numeric" maxlength="4" />
-              </div>
-            </div>
+            <div class="flex flex-col gap-3">
+              <button
+                class="flex items-center justify-center gap-3 rounded-xl border-2 border-brand-500 bg-brand-500 px-8 py-4 text-white font-semibold transition hover:bg-brand-600 hover:shadow-lg hover:shadow-brand-500/30"
+                :disabled="processing"
+                @click="next"
+              >
+                <ExternalLink class="h-5 w-5" />
+                {{ processing ? 'Redirigiendo...' : 'Pagar con Mercado Pago' }}
+              </button>
 
-            <div class="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800">
-              <p class="font-bold">🎮 Datos para la demo:</p>
-              <ul class="mt-1 list-inside list-disc space-y-0.5">
-                <li>Tarjeta que termina en <strong>par</strong> → pago aprobado</li>
-                <li>Tarjeta con <strong>9999</strong> → pago rechazado</li>
-                <li>Cualquier otra → pago pendiente de confirmación</li>
-              </ul>
-              <p class="mt-1">No se almacenan datos reales de tarjetas. Probá con <strong>4000 0000 0000 0002</strong>.
+              <p class="text-xs text-slate-500">
+                🔒 Pago seguro procesado por Mercado Pago. No almacenamos datos de tarjetas.
               </p>
             </div>
-          </template>
 
-          <template v-else>
-            <div class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-5">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div class="flex items-start gap-3">
-                <Landmark class="mt-0.5 h-6 w-6 text-brand-600" />
-                <div>
-                  <p class="font-semibold text-slate-800">Transferencia bancaria simulada</p>
-                  <p class="mt-1 text-sm text-slate-600">
-                    Al confirmar, te mostraremos los datos de la cuenta para realizar la transferencia.
-                    El pedido quedará <strong>pendiente de confirmación</strong> hasta que el administrador apruebe el
-                    pago.
+                <Landmark class="mt-0.5 h-5 w-5 text-slate-400" />
+                <div class="text-xs text-slate-600">
+                  <p class="font-medium">Información del pedido</p>
+                  <p class="mt-1">
+                    {{ cart.cart?.items?.length }} artículo{{ cart.cart?.items?.length === 1 ? '' : 's' }} — Total: {{ currency(total) }}
+                  </p>
+                  <p class="mt-1">
+                    El envío será gestionado por <a href='https://www.andreani.com/' target="_blank" class="underline">Andreani</a>
                   </p>
                 </div>
               </div>
             </div>
-          </template>
+          </div>
+
+          <div v-else class="text-center py-8">
+            <Loader2 class="mx-auto h-12 w-12 animate-spin text-brand-600" />
+            <p class="mt-4 text-lg font-medium text-slate-600">Redirigiendo al pago...</p>
+            <p class="mt-1 text-sm text-slate-500">No cierres esta ventana</p>
+          </div>
         </div>
 
         <!-- Nav buttons -->

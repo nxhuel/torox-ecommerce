@@ -149,6 +149,10 @@ export const ordersService = {
     api().api<Order>(`/orders/${id}/reject-payment`, { method: 'POST', body: { reason } }),
   cancel: (id: string, reason?: string) =>
     api().api<Order>(`/orders/${id}/cancel`, { method: 'POST', body: { reason } }),
+  startMercadoPago: (orderId: string, data: { customerEmail: string; customerName?: string; customerPhone?: string }) =>
+    api().api(`/orders/${orderId}/start-mercado-pago`, { method: 'POST', body: data }),
+  getMercadoPagoUrl: (orderId: string) =>
+    api().api(`/orders/${orderId}/mercado-pago-url`),
 }
 
 /* ---------- Favorites ---------- */
