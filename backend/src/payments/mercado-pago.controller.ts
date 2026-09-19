@@ -53,7 +53,7 @@ export class MercadoPagoController {
     }
 
     // Get the frontend URL for redirect URLs
-    const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const frontendUrl = (this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000').replace(/\/+$/, '');
     
     const result = await this.mercadoPagoService.createPreference(
       dto.orderId,
