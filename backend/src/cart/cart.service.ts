@@ -5,7 +5,7 @@ import { Cart, CartItem } from './entities/cart.entity';
 import { ProductsService } from '../products/products.service';
 
 const FREE_SHIPPING_THRESHOLD = 50000;
-const SHIPPING_COST = 3500;
+const SHIPPING_COST = 0;
 
 @Injectable()
 export class CartService {

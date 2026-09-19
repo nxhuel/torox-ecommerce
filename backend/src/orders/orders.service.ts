@@ -21,7 +21,7 @@ import { PromotionsService } from '../promotions/promotions.service';
 import { MailService } from '../mail/mail.service';
 
 const FREE_SHIPPING_THRESHOLD = 50000;
-const SHIPPING_COST = 3500;
+const SHIPPING_COST = 0;
 
 @Injectable()
 export class OrdersService {

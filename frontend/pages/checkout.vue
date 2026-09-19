@@ -439,7 +439,7 @@ async function placeOrderWithMercadoPago() {
           <div class="flex justify-between text-slate-600">
             <span>Envío</span>
             <span class="font-semibold" :class="shippingCost === 0 ? 'text-emerald-600' : 'text-slate-900'">
-              {{ shippingCost === 0 ? '$0 (PS)' : currency(shippingCost) }}
+              {{ shippingCost === 0 ? 'Gratis' : currency(shippingCost) }}
             </span>
           </div>
           <div class="flex justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900">

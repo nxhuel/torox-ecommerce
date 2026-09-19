@@ -256,7 +256,7 @@ const shipmentProgress = computed(() => {
                   <span>Descuento</span><span>-{{ currency(order.discount) }}</span>
                 </div>
                 <div class="flex justify-between text-slate-600">
-                  <span>Envío</span><span>{{ order.shippingCost === 0 ? '$3.000 (PS).' : currency(order.shippingCost) }}</span>
+                  <span>Envío</span><span>{{ order.shippingCost === 0 ? 'Gratis' : currency(order.shippingCost) }}</span>
                 </div>
                 <div class="flex justify-between border-t border-slate-100 pt-2 text-base font-bold text-slate-900">
                   <span>Total</span><span>{{ currency(order.total) }}</span>

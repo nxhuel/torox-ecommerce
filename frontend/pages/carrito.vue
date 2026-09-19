@@ -98,7 +98,7 @@ function productImage(item: any) {
             <div class="flex justify-between text-slate-600">
               <span>Envío</span>
               <span class="font-semibold" :class="cart.cart.shippingCost === 0 ? 'text-emerald-600' : 'text-slate-900'">
-                {{ cart.cart.shippingCost === 0 ? '$3.000 (PS)' : currency(cart.cart.shippingCost) }}
+                {{ cart.cart.shippingCost === 0 ? 'Gratis' : currency(cart.cart.shippingCost) }}
               </span>
             </div>
             <div class="border-t border-slate-100 pt-3">
