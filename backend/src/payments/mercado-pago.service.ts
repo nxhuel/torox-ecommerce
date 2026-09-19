@@ -285,9 +285,19 @@ export class MercadoPagoService implements PaymentProvider {
         return false;
       }
 
-      // Calcular el manifest según la documentación de MercadoPago:
-      // id:<notificationId>;request-id:<requestId>;ts:<timestamp>;
-      const manifest = `id:${notificationId};request-id:${requestId};ts:${timestamp};`;
+      // Generar el manifest según la documentación de MercadoPago:
+      // id:<data.id>;request-id:<x-request-id>;ts:<timestamp>;
+      // (los valores ausentes se omiten, y data.id se minimiza si es alfanumérico)
+      const manifestParts: string[] = [];
+      if (notificationId) {
+        manifestParts.push(`id:${notificationId.toLowerCase()}`);
+      }
+      if (requestId) {
+        manifestParts.push(`request-id:${requestId}`);
+      }
+      manifestParts.push(`ts:${timestamp}`);
+      const manifest = `${manifestParts.join(';')};`;
+
       const expectedHash = crypto
         .createHmac('sha256', this.webhookToken)
         .update(manifest)

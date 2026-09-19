@@ -19,6 +19,7 @@ export enum PaymentMethod {
   CREDIT_CARD = 'CREDIT_CARD',
   DEBIT_CARD = 'DEBIT_CARD',
   BANK_TRANSFER = 'BANK_TRANSFER',
+  MERCADO_PAGO = 'MERCADO_PAGO',
 }
 
 @Entity('payments')

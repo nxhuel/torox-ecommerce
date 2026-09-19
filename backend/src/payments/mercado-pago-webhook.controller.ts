@@ -3,6 +3,7 @@ import {
   Post,
   Body,
   Headers,
+  Query,
   HttpStatus,
   HttpCode,
   BadRequestException,
@@ -38,6 +39,8 @@ export class MercadoPagoWebhookController {
     @Headers('x-signature') signature: string,
     @Headers('x-request-id') requestId: string,
     @Headers('content-type') contentType: string,
+    @Query('data.id') dataIdQuery: string,
+    @Query('type') typeQuery: string,
   ) {
     this.logger.log(`Webhook received - requestId: ${requestId}`);
 
@@ -49,7 +52,9 @@ export class MercadoPagoWebhookController {
       return { received: false, error: 'Body inválido' };
     }
 
-    const paymentId = notification.data?.id?.toString();
+    // El data.id puede llegar en el query param (?data.id=...) o en el body.
+    // MercadoPago firma usando el valor del query param.
+    const paymentId = dataIdQuery || notification.data?.id?.toString() || '';
     if (!paymentId) {
       this.logger.error('Webhook sin data.id');
       return { received: false, error: 'Falta data.id' };
@@ -72,8 +77,8 @@ export class MercadoPagoWebhookController {
         this.logger.warn('MERCADO_PAGO_WEBHOOK_TOKEN no configurado - saltando validación de firma');
       }
 
-      // Determinar si es un evento de pago
-      const typeStr = notification.type != null ? String(notification.type) : '';
+      // Determinar si es un evento de pago (el type puede llegar en query o en body)
+      const typeStr = notification.type != null ? String(notification.type) : typeQuery || '';
       const actionStr = notification.action || '';
       const isPaymentEvent =
         typeStr === '1' ||
@@ -81,7 +86,7 @@ export class MercadoPagoWebhookController {
         typeStr.includes('payment') ||
         actionStr.includes('payment');
 
-      this.logger.log(`Notification type=${notification.type} action=${actionStr} isPayment=${isPaymentEvent}`);
+      this.logger.log(`Notification type=${typeStr} action=${actionStr} isPayment=${isPaymentEvent}`);
 
       if (isPaymentEvent) {
         await this.processPaymentNotification(paymentId);

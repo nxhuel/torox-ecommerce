@@ -1,5 +1,5 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { Module, forwardRef } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PassportModule } from '@nestjs/passport';
@@ -11,6 +11,7 @@ import { Payment } from './entities/payment.entity';
 import { MockPaymentProvider } from './providers/mock-payment.provider';
 import { PAYMENT_PROVIDER } from './providers/payment-provider.interface';
 import { MercadoPagoWebhookController } from './mercado-pago-webhook.controller';
+import { OrdersModule } from '../orders/orders.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { MercadoPagoWebhookController } from './mercado-pago-webhook.controller'
     PassportModule.register({ defaultStrategy: 'jwt' }),
     ConfigModule,
     HttpModule,
+    forwardRef(() => OrdersModule),
   ],
   controllers: [PaymentsController, MercadoPagoController, MercadoPagoWebhookController],
   providers: [

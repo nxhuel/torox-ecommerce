@@ -80,6 +80,24 @@ export class PaymentsService {
     return this.repo.save(payment);
   }
 
+  /**
+   * Crea un pago PENDING para el flujo de MercadoPago Checkout Pro.
+   * El webhook de MercadoPago lo confirmará/actualizará cuando el cliente pague.
+   */
+  async createPendingMercadoPago(orderId: string, amount: number): Promise<Payment> {
+    const payment = this.repo.create({
+      orderId,
+      amount,
+      method: PaymentMethodEntity.MERCADO_PAGO,
+      status: PaymentStatus.PENDING,
+      provider: 'MERCADO_PAGO_CHECKOUT_PRO',
+      reference: `MP-${Date.now()}`,
+      message: 'Pago pendiente. Redirigiendo al checkout de MercadoPago...',
+    });
+
+    return this.repo.save(payment);
+  }
+
   async approve(id: string): Promise<Payment> {
     const payment = await this.findOne(id);
     if (payment.status === PaymentStatus.REJECTED) {

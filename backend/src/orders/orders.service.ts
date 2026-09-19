@@ -115,8 +115,11 @@ export class OrdersService {
     }
     await this.cartService.clearCart(cart.id);
 
-    // Process the simulated payment.
-    const payment = await this.paymentsService.createPayment(saved.id, total, dto.payment);
+    // Process the payment. For MercadoPago Checkout Pro no se envía `payment`
+    // desde el frontend: se crea un pago PENDING que el webhook confirmará.
+    const payment = dto.payment
+      ? await this.paymentsService.createPayment(saved.id, total, dto.payment)
+      : await this.paymentsService.createPendingMercadoPago(saved.id, total);
 
     if (payment.status === 'APPROVED') {
       await this.handlePaymentApproved(saved.id, payment);

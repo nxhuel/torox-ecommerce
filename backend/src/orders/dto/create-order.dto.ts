@@ -43,10 +43,11 @@ export class CreateOrderDto {
   @IsEnum(ShippingMethod)
   shippingMethod: ShippingMethod;
 
+  @IsOptional()
   @IsObject()
   @ValidateNested()
   @Type(() => PaymentDataDto)
-  payment: PaymentDataDto;
+  payment?: PaymentDataDto;
 
   @IsOptional() @IsString() notes?: string;
 

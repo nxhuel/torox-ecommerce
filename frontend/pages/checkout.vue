@@ -129,24 +129,8 @@ function validateStep(current: number): boolean {
     }
   }
   if (current === 4) {
-    if (form.paymentMethod !== 'BANK_TRANSFER') {
-      if (form.cardNumber.replace(/\D/g, '').length < 12) {
-        error.value = 'El número de tarjeta es inválido.'
-        return false
-      }
-      if (!form.cardHolder.trim()) {
-        error.value = 'Ingresá el titular de la tarjeta.'
-        return false
-      }
-      if (form.cardExpiry.replace(/\D/g, '').length !== 4) {
-        error.value = 'Ingresá la fecha de vencimiento.'
-        return false
-      }
-      if (form.cardCvc.length < 3) {
-        error.value = 'Ingresá el código de seguridad.'
-        return false
-      }
-    }
+    // Paso 4: pago con MercadoPago Checkout Pro. No se requiere validar tarjeta
+    // en el frontend; MercadoPago se encarga del pago.
   }
   return true
 }

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrdersService } from './orders.service';
@@ -20,7 +20,7 @@ import { MailModule } from '../mail/mail.module';
     TypeOrmModule.forFeature([Order, OrderItem]),
     CartModule,
     ProductsModule,
-    PaymentsModule,
+    forwardRef(() => PaymentsModule),
     ShipmentsModule,
     NotificationsModule,
     FinanceModule,
