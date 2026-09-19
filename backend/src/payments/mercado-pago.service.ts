@@ -143,7 +143,7 @@ export class MercadoPagoService implements PaymentProvider {
 
     const response = await firstValueFrom(
       this.http.post<MercadoPagoPreferenceResponse>(
-        `${this.baseUrl}/v1/preferences`,
+        `${this.baseUrl}/checkout/preferences`,
         preference,
         {
           headers: {
@@ -166,7 +166,7 @@ export class MercadoPagoService implements PaymentProvider {
   async cancelPreference(preferenceId: number): Promise<void> {
     this.logger.log(`Cancelling preference ${preferenceId}`);
     await firstValueFrom(
-      this.http.delete(`${this.baseUrl}/v1/preferences/${preferenceId}`, {
+      this.http.delete(`${this.baseUrl}/checkout/preferences/${preferenceId}`, {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
         },
