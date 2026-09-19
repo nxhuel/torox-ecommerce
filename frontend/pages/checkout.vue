@@ -16,12 +16,14 @@ import { useCartStore } from '~/stores/cart'
 import { useAuthStore } from '~/stores/auth'
 import { ordersService } from '~/services'
 import { useFormat } from '~/composables/useFormat'
+import { useApi } from '~/composables/useApi'
 
 const router = useRouter()
 const cart = useCartStore()
 const auth = useAuthStore()
 const { currency } = useFormat()
 const toast = useToast()
+const { api } = useApi()
 
 const step = ref(1)
 const processing = ref(false)
@@ -179,8 +181,8 @@ async function placeOrderWithMercadoPago() {
     await cart.refresh()
 
     // Now create the MercadoPago preference
-    const mpResult = await $fetch<{ preferenceId: number; initPoint: string }>(
-      '/api/payments/mercadopago/create-preference',
+    const mpResult = await api<{ preferenceId: number; initPoint: string }>(
+      '/payments/mercadopago/create-preference',
       {
         method: 'POST',
         body: {
