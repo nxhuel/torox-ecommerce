@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import * as crypto from 'crypto';
 import {
   PaymentProvider,
   ProcessPaymentInput,
@@ -193,6 +194,20 @@ export class MercadoPagoService implements PaymentProvider {
   }
 
   /**
+   * Get a single payment from MercadoPago by its payment ID
+   */
+  async getPaymentById(paymentId: string) {
+    const response = await firstValueFrom(
+      this.http.get(`${this.baseUrl}/v1/payments/${paymentId}`, {
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+        },
+      }),
+    );
+    return response.data.body ?? response.data;
+  }
+
+  /**
    * Process payment - for Checkout Pro this is handled by webhook,
    * but this method returns a pending result that gets updated via webhook
    */
@@ -238,20 +253,31 @@ export class MercadoPagoService implements PaymentProvider {
 
   /**
    * Validar la firma de un webhook de MercadoPago
-   * @param body Contenido del body del webhook
-   * @param signature Firma recibida en el header x-signature
+   * @param signature Firma recibida en el header x-signature (formato: ts=...,v1=...)
+   * @param requestId Header x-request-id
+   * @param notificationId ID de la notificación (data.id del body)
    * @returns true si la firma es válida
    */
-  validateWebhookSignature(body: string, signature: string): boolean {
+  validateWebhookSignature(
+    signature: string,
+    requestId: string,
+    notificationId: string,
+  ): boolean {
     if (!this.webhookToken) {
       this.logger.warn('MERCADO_PAGO_WEBHOOK_TOKEN no configurado. Saltando validación de firma.');
       return true; // Si no hay token configurado, aceptamos la solicitud
     }
 
     try {
-      // La firma viene en formato: t=1234567890,v1=abc123...
-      const parts = new URLSearchParams(signature);
-      const timestamp = parts.get('t');
+      // La firma viene en formato: ts=1234567890,v1=abc123...
+      const parts = new Map<string, string>();
+      for (const pair of signature.split(',')) {
+        const idx = pair.indexOf('=');
+        if (idx > 0) {
+          parts.set(pair.slice(0, idx).trim(), pair.slice(idx + 1).trim());
+        }
+      }
+      const timestamp = parts.get('ts');
       const hash = parts.get('v1');
 
       if (!timestamp || !hash) {
@@ -259,19 +285,26 @@ export class MercadoPagoService implements PaymentProvider {
         return false;
       }
 
-      // Calcular hash esperado: HMAC-SHA256(timestamp + body, webhook_token)
-      const crypto = require('crypto');
+      // Calcular el manifest según la documentación de MercadoPago:
+      // id:<notificationId>;request-id:<requestId>;ts:<timestamp>;
+      const manifest = `id:${notificationId};request-id:${requestId};ts:${timestamp};`;
       const expectedHash = crypto
         .createHmac('sha256', this.webhookToken)
-        .update(timestamp + body)
+        .update(manifest)
         .digest('hex');
 
-      // Comparar hashes de forma segura
-      const expected = expectedHash.slice(0, hash.length);
-      return hash === expected;
+      if (expectedHash !== hash) {
+        this.logger.warn(`Firma inválida: recibida=${hash} esperada=${expectedHash}`);
+        return false;
+      }
+      return true;
     } catch (error) {
       this.logger.error(`Error validando firma del webhook: ${error}`);
       return false;
     }
+  }
+
+  isWebhookConfigured(): boolean {
+    return !!this.webhookToken;
   }
 }

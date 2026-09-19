@@ -14,12 +14,10 @@ import { OrdersService } from '../orders/orders.service';
 
 interface MercadoPagoWebhookNotification {
   id: string;
-  type: number;
-  data: {
-    id: number;
-    authorized_payment?: {
-      id: number;
-    };
+  type?: number | string;
+  action?: string;
+  data?: {
+    id: number | string;
   };
 }
 
@@ -43,82 +41,81 @@ export class MercadoPagoWebhookController {
   ) {
     this.logger.log(`Webhook received - requestId: ${requestId}`);
 
+    let notification: MercadoPagoWebhookNotification;
     try {
-      // Validar content-type
-      if (!contentType?.includes('application/json')) {
-        throw new BadRequestException('Content-Type must be application/json');
-      }
+      notification = this.parseNotification(body);
+    } catch (error) {
+      this.logger.error('Error parseando el body del webhook', error);
+      return { received: false, error: 'Body inválido' };
+    }
 
-      // Validar firma si está configurado (opcional por ahora)
-      // Para habilitar: configurar MERCADO_PAGO_WEBHOOK_TOKEN en .env
-      const signatureStr = signature || '';
-      if (signatureStr && this.mercadoPagoService.validateWebhookSignature) {
+    const paymentId = notification.data?.id?.toString();
+    if (!paymentId) {
+      this.logger.error('Webhook sin data.id');
+      return { received: false, error: 'Falta data.id' };
+    }
+
+    try {
+      // Validar firma si está configurado (MERCADO_PAGO_WEBHOOK_TOKEN)
+      if (this.mercadoPagoService.isWebhookConfigured()) {
         const isValid = this.mercadoPagoService.validateWebhookSignature(
-          JSON.stringify(body),
-          signatureStr,
+          signature || '',
+          requestId || '',
+          paymentId,
         );
         if (!isValid) {
           this.logger.warn('Firma de webhook inválida - posible ataque');
           throw new BadRequestException('Firma inválida');
         }
+        this.logger.log('Firma de webhook válida');
+      } else {
+        this.logger.warn('MERCADO_PAGO_WEBHOOK_TOKEN no configurado - saltando validación de firma');
       }
 
-      // Parsear notificación
-      const notification = this.parseNotification(body);
-      this.logger.log(`Processing notification type: ${notification.type}, id: ${notification.id}`);
+      // Determinar si es un evento de pago
+      const typeStr = notification.type != null ? String(notification.type) : '';
+      const actionStr = notification.action || '';
+      const isPaymentEvent =
+        typeStr === '1' ||
+        typeStr === '2' ||
+        typeStr.includes('payment') ||
+        actionStr.includes('payment');
 
-      // Procesar según tipo de evento
-      // Type 1 = payment.created / payment.authorized
-      // Type 2 = payment.updated
-      if (notification.type === 1 || notification.type === 2) {
-        await this.processPaymentNotification(notification);
+      this.logger.log(`Notification type=${notification.type} action=${actionStr} isPayment=${isPaymentEvent}`);
+
+      if (isPaymentEvent) {
+        await this.processPaymentNotification(paymentId);
       }
 
-      // Return 200 OK to acknowledge receipt
       return { received: true, eventId: requestId };
     } catch (error: any) {
       this.logger.error(`Webhook error: ${error?.message}`, error?.stack);
-      // No re-throw para no causar retries en MercadoPago
-      // Pero registramos el error
       return { received: false, error: error?.message };
     }
   }
 
   private parseNotification(body: any): MercadoPagoWebhookNotification {
-    try {
-      if (typeof body === 'string') {
-        return JSON.parse(body) as MercadoPagoWebhookNotification;
-      }
-      return body as MercadoPagoWebhookNotification;
-    } catch (error) {
-      this.logger.error('Error parseando body del webhook:', error);
-      throw new BadRequestException('Body inválido');
+    if (typeof body === 'string') {
+      return JSON.parse(body) as MercadoPagoWebhookNotification;
     }
+    return body as MercadoPagoWebhookNotification;
   }
 
-  private async processPaymentNotification(notification: MercadoPagoWebhookNotification) {
-    const paymentId = notification.data.id;
+  private async processPaymentNotification(paymentId: string) {
     this.logger.log(`Processing payment notification: ${paymentId}`);
 
     try {
-      // Obtener detalles del pago desde MercadoPago
-      const payments = await this.mercadoPagoService.getPaymentByOrderId(
-        notification.data.id.toString(),
-      );
+      // Obtener los detalles del pago por su ID real
+      const mpPayment = await this.mercadoPagoService.getPaymentById(paymentId);
+      const orderId = mpPayment?.external_reference;
 
-      // Buscar el pago que coincide con esta notificación
-      for (const mpPayment of payments) {
-        const mpPaymentId = mpPayment.id || mpPayment.payment_id;
-        const authorizedPaymentId = mpPayment.authorized_payment?.id;
-
-        if (mpPaymentId === paymentId || authorizedPaymentId === paymentId) {
-          const orderId = mpPayment.external_reference;
-          if (orderId) {
-            this.logger.log(`Found order ${orderId} for payment ${paymentId}`);
-            await this.processOrderPayment(orderId, mpPayment);
-          }
-        }
+      if (!orderId) {
+        this.logger.warn(`Payment ${paymentId} sin external_reference (orderId)`);
+        return;
       }
+
+      this.logger.log(`Found order ${orderId} for payment ${paymentId}`);
+      await this.processOrderPayment(orderId, mpPayment);
     } catch (error: any) {
       this.logger.error(`Error procesando notificación de pago: ${error?.message}`);
     }
@@ -145,7 +142,7 @@ export class MercadoPagoWebhookController {
         // Actualizar orden y notificar
         await this.orderService.approvePayment(orderId);
         this.logger.log(`Order ${orderId} approved via webhook`);
-      } else if (mpStatus === 'rejected') {
+      } else if (mpStatus === 'rejected' || mpStatus === 'cancelled') {
         // Rechazar pago
         await this.paymentsService.reject(payment.id, 'Pago rechazado por MercadoPago');
         this.logger.log(`Order ${orderId} rejected via webhook`);
