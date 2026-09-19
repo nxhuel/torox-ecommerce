@@ -154,7 +154,8 @@ export class MercadoPagoService implements PaymentProvider {
       ),
     );
 
-    const { id, init_point } = response.data.body;
+    const createdPreference = response.data?.body ?? response.data;
+    const { id, init_point } = createdPreference;
     this.logger.log(`Preference created: ${id}, init_point: ${init_point}`);
 
     return { preferenceId: id, initPoint: init_point };
