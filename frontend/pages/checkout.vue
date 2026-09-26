@@ -103,16 +103,22 @@ const steps = [
   { number: 4, label: 'Pago', icon: CreditCard },
 ]
 
-const freeShipping = computed(() => {
-  const subtotal = cart.cart?.subtotal || 0
-  return subtotal >= (cart.cart?.freeShippingThreshold || 50000)
-})
-
 const shippingCost = computed(() => {
   if (!cart.cart) return 0
-  if (form.shippingMethod === 'PICKUP' || freeShipping.value) return 0
+  if (form.shippingMethod === 'PICKUP') return 0
   // Si ya cotizamos con Envia.com, usar ese valor; si no, usar el del carrito
   return quotedShippingCost.value ?? cart.cart.shippingCost
+})
+
+// El envío recién se conoce cuando cotiza Envia con la dirección ingresada.
+const shippingPending = computed(
+  () => form.shippingMethod !== 'PICKUP' && quotedShippingCost.value === null,
+)
+
+const shippingLabel = computed(() => {
+  if (form.shippingMethod === 'PICKUP') return 'Gratis'
+  if (shippingPending.value) return 'A cotizar'
+  return quotedShippingCost.value === 0 ? 'Gratis' : currency(quotedShippingCost.value)
 })
 
 // Mismo cálculo que hace el backend al crear la orden:
@@ -125,7 +131,7 @@ const displayTotal = computed(() => {
 
 // Cotiza el envío cuando el usuario completa CP y provincia en el paso 2
 async function fetchShippingQuote() {
-  if (form.shippingMethod === 'PICKUP' || freeShipping.value) {
+  if (form.shippingMethod === 'PICKUP') {
     quotedShippingCost.value = 0
     return
   }
@@ -380,7 +386,6 @@ async function placeOrderWithMercadoPago() {
                   <span v-if="quotingShipping" class="flex items-center gap-1.5 text-slate-500">
                     <Loader2 class="h-3.5 w-3.5 animate-spin" /> Calculando costo de envío...
                   </span>
-                  <span v-else-if="freeShipping" class="font-semibold text-emerald-600">Envío gratis</span>
                   <span v-else-if="quotedShippingCost !== null" class="font-semibold text-slate-800">
                     {{ currency(quotedShippingCost) }}
                   </span>
@@ -490,8 +495,8 @@ async function placeOrderWithMercadoPago() {
           </div>
           <div class="flex justify-between text-slate-600">
             <span>Envío</span>
-            <span class="font-semibold" :class="shippingCost === 0 ? 'text-emerald-600' : 'text-slate-900'">
-              {{ shippingCost === 0 ? 'Gratis' : currency(shippingCost) }}
+            <span class="font-semibold" :class="shippingPending ? 'text-slate-500' : shippingCost === 0 ? 'text-emerald-600' : 'text-slate-900'">
+              {{ shippingLabel }}
             </span>
           </div>
           <div class="flex justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900">

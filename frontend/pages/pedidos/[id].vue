@@ -8,6 +8,7 @@ import {
   MapPin,
   CreditCard,
   Shield,
+  ExternalLink,
 } from 'lucide-vue-next'
 import type { Order } from '~/types'
 import { ordersService } from '~/services'
@@ -156,6 +157,18 @@ const shipmentProgress = computed(() => {
                   </div>
                 </div>
 
+                <div v-if="order.shipment?.trackUrl" class="mt-4">
+                  <a
+                    :href="order.shipment.trackUrl"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    <ExternalLink class="h-4 w-4" />
+                    Rastrear en envía.com
+                  </a>
+                </div>
+
                 <!-- Progress -->
                 <div class="mt-6">
                   <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -256,7 +269,7 @@ const shipmentProgress = computed(() => {
                   <span>Descuento</span><span>-{{ currency(order.discount) }}</span>
                 </div>
                 <div class="flex justify-between text-slate-600">
-                  <span>Envío</span><span>{{ order.shippingCost === 0 ? 'Gratis' : currency(order.shippingCost) }}</span>
+                  <span>Envío</span><span>{{ order.shippingCost === 0 ? 'Sin costo' : currency(order.shippingCost) }}</span>
                 </div>
                 <div class="flex justify-between border-t border-slate-100 pt-2 text-base font-bold text-slate-900">
                   <span>Total</span><span>{{ currency(order.total) }}</span>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ShoppingCart, Trash2, ArrowRight, ArrowLeft, Truck } from 'lucide-vue-next'
+import { ShoppingCart, Trash2, ArrowRight, ArrowLeft } from 'lucide-vue-next'
 import { useCartStore } from '~/stores/cart'
 import { useFormat } from '~/composables/useFormat'
 
@@ -97,9 +97,7 @@ function productImage(item: any) {
             </div>
             <div class="flex justify-between text-slate-600">
               <span>Envío</span>
-              <span class="font-semibold" :class="cart.cart.shippingCost === 0 ? 'text-emerald-600' : 'text-slate-900'">
-                {{ cart.cart.shippingCost === 0 ? 'Gratis' : currency(cart.cart.shippingCost) }}
-              </span>
+              <span class="text-slate-500">A cotizar</span>
             </div>
             <div class="border-t border-slate-100 pt-3">
               <div class="flex justify-between text-base font-bold text-slate-900">
@@ -109,12 +107,9 @@ function productImage(item: any) {
             </div>
           </div>
 
-          <!-- <div v-if="cart.cart.subtotal < cart.cart.freeShippingThreshold" class="mt-4 flex items-start gap-2 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
-            <Truck class="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              Te faltan {{ currency(cart.cart.freeShippingThreshold - cart.cart.subtotal) }} para envío gratis
-            </span>
-          </div> -->
+          <p class="mt-3 text-xs text-slate-400">
+            El costo de envío se calcula en el checkout según tu dirección.
+          </p>
 
           <button class="btn-primary mt-5 w-full !py-3" @click="router.push('/checkout')">
             Continuar compra <ArrowRight class="h-4 w-4" />

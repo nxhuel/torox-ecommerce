@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Shipment, ShipmentStatus } from './entities/shipment.entity';
@@ -13,6 +13,8 @@ import { ProductsService } from '../products/products.service';
 
 @Injectable()
 export class ShipmentsService {
+  private readonly logger = new Logger(ShipmentsService.name);
+
   constructor(
     @InjectRepository(Shipment)
     private readonly repo: Repository<Shipment>,
@@ -21,6 +23,64 @@ export class ShipmentsService {
     private readonly envia: EnviaProvider,
     private readonly productsService: ProductsService,
   ) {}
+
+  // Defaults usados cuando un producto no tiene peso/medidas cargados en el admin.
+  private readonly DEFAULT_WEIGHT_KG = 0.5;
+  private readonly DEFAULT_WIDTH_CM = 15;
+  private readonly DEFAULT_HEIGHT_CM = 10;
+  private readonly DEFAULT_LENGTH_CM = 15;
+
+  /**
+   * Resuelve el paquete de una lista de items de pedido: peso total
+   * (sumado por cantidad), medidas máximas, y valor declarado.
+   * Usa defaults cuando un producto no tiene peso/medidas cargados.
+   */
+  private async resolvePackageFromItems(
+    items: { productId: string; quantity: number }[],
+  ): Promise<{
+    weightKg: number;
+    widthCm: number;
+    heightCm: number;
+    lengthCm: number;
+    declaredValue: number;
+    missingData: { productId: string; name: string }[];
+  }> {
+    let totalWeight = 0;
+    let declaredValue = 0;
+    let maxWidth = this.DEFAULT_WIDTH_CM;
+    let maxHeight = this.DEFAULT_HEIGHT_CM;
+    let maxLength = this.DEFAULT_LENGTH_CM;
+    const missingData: { productId: string; name: string }[] = [];
+
+    for (const item of items) {
+      try {
+        const product = await this.productsService.findOne(item.productId);
+        if (product.weightKg == null) {
+          missingData.push({ productId: item.productId, name: product.name });
+        }
+        if (product.widthCm == null || product.heightCm == null || product.lengthCm == null) {
+          missingData.push({ productId: item.productId, name: product.name });
+        }
+        totalWeight += (product.weightKg ?? this.DEFAULT_WEIGHT_KG) * item.quantity;
+        declaredValue += (product.finalPrice ?? product.price ?? 0) * item.quantity;
+        maxWidth = Math.max(maxWidth, product.widthCm ?? this.DEFAULT_WIDTH_CM);
+        maxHeight = Math.max(maxHeight, product.heightCm ?? this.DEFAULT_HEIGHT_CM);
+        maxLength = Math.max(maxLength, product.lengthCm ?? this.DEFAULT_LENGTH_CM);
+      } catch {
+        totalWeight += this.DEFAULT_WEIGHT_KG * item.quantity;
+      }
+    }
+    if (totalWeight <= 0) totalWeight = this.DEFAULT_WEIGHT_KG;
+
+    return {
+      weightKg: totalWeight,
+      widthCm: maxWidth,
+      heightCm: maxHeight,
+      lengthCm: maxLength,
+      declaredValue,
+      missingData,
+    };
+  }
 
   /**
    * Cotiza el costo de envío para los datos del formulario de checkout.
@@ -33,31 +93,24 @@ export class ShipmentsService {
     items: { productId: string; quantity: number }[];
   }): Promise<number> {
     try {
-      let totalWeight = 0;
-      let declaredValue = 0;
-      let maxWidth = 15, maxHeight = 10, maxLength = 15;
-      for (const item of params.items) {
-        try {
-          const product = await this.productsService.findOne(item.productId);
-          totalWeight += (product.weightKg ?? 0.5) * item.quantity;
-          declaredValue += (product.finalPrice ?? product.price ?? 0) * item.quantity;
-          maxWidth = Math.max(maxWidth, product.widthCm ?? 15);
-          maxHeight = Math.max(maxHeight, product.heightCm ?? 10);
-          maxLength = Math.max(maxLength, product.lengthCm ?? 15);
-        } catch {
-          totalWeight += 0.5 * item.quantity;
-        }
+      const { weightKg, widthCm, heightCm, lengthCm, declaredValue, missingData } =
+        await this.resolvePackageFromItems(params.items);
+
+      if (missingData.length) {
+        this.logger.warn(
+          `Algunos productos sin peso/medidas cargados (se usan defaults ${this.DEFAULT_WIDTH_CM}x${this.DEFAULT_HEIGHT_CM}x${this.DEFAULT_LENGTH_CM} cm, ${this.DEFAULT_WEIGHT_KG} kg): %o`,
+          missingData.map((m) => `${m.name} (${m.productId})`),
+        );
       }
-      if (totalWeight <= 0) totalWeight = 0.5;
 
       const result = await this.quote({
         provinceName: params.province,
         city: params.city,
         postalCode: params.postalCode,
-        weightKg: totalWeight,
-        widthCm: maxWidth,
-        heightCm: maxHeight,
-        lengthCm: maxLength,
+        weightKg,
+        widthCm,
+        heightCm,
+        lengthCm,
         declaredValue,
       });
       return result.cost ?? 0;
@@ -85,10 +138,10 @@ export class ShipmentsService {
       provinceCode,
       postalCode: params.postalCode,
       city: params.city,
-      weightKg: params.weightKg ?? 0.5,
-      widthCm: params.widthCm ?? 15,
-      heightCm: params.heightCm ?? 10,
-      lengthCm: params.lengthCm ?? 15,
+      weightKg: params.weightKg ?? this.DEFAULT_WEIGHT_KG,
+      widthCm: params.widthCm ?? this.DEFAULT_WIDTH_CM,
+      heightCm: params.heightCm ?? this.DEFAULT_HEIGHT_CM,
+      lengthCm: params.lengthCm ?? this.DEFAULT_LENGTH_CM,
       declaredValue: params.declaredValue,
     });
   }
@@ -103,23 +156,9 @@ export class ShipmentsService {
     lengthCm: number;
     declaredValue: number;
   }> {
-    let totalWeight = 0;
-    let declaredValue = 0;
-    let maxWidth = 15, maxHeight = 10, maxLength = 15;
-    for (const item of order.items || []) {
-      try {
-        const product = await this.productsService.findOne(item.productId);
-        totalWeight += (product.weightKg ?? 0.5) * item.quantity;
-        declaredValue += Number(item.unitPrice ?? product.price ?? 0) * item.quantity;
-        maxWidth = Math.max(maxWidth, product.widthCm ?? 15);
-        maxHeight = Math.max(maxHeight, product.heightCm ?? 10);
-        maxLength = Math.max(maxLength, product.lengthCm ?? 15);
-      } catch {
-        totalWeight += 0.5 * item.quantity;
-      }
-    }
-    if (totalWeight <= 0) totalWeight = 0.5;
-    return { weightKg: totalWeight, widthCm: maxWidth, heightCm: maxHeight, lengthCm: maxLength, declaredValue };
+    const { weightKg, widthCm, heightCm, lengthCm, declaredValue } =
+      await this.resolvePackageFromItems(order.items?.map((i) => ({ productId: i.productId, quantity: i.quantity })) ?? []);
+    return { weightKg, widthCm, heightCm, lengthCm, declaredValue };
   }
 
   /**
@@ -178,6 +217,7 @@ export class ShipmentsService {
       events: result.events,
       enviaId: result.enviaId,
       labelUrl: result.labelUrl,
+      trackUrl: result.trackingUrl,
     });
 
     return this.repo.save(shipment);
@@ -291,6 +331,23 @@ export class ShipmentsService {
       shipment.deliveredAt = new Date();
     }
     await this.repo.save(shipment);
+  }
+
+  async getPackageDetails(order: Order): Promise<{
+    weightKg: number
+    widthCm: number
+    heightCm: number
+    lengthCm: number
+    declaredValue: number
+  }> {
+    const pkg = await this.resolvePackage(order)
+    return {
+      weightKg: pkg.weightKg,
+      widthCm: pkg.widthCm,
+      heightCm: pkg.heightCm,
+      lengthCm: pkg.lengthCm,
+      declaredValue: pkg.declaredValue,
+    }
   }
 
   private getDescription(status: ShipmentStatus): string {

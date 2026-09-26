@@ -154,7 +154,7 @@ async function loadFeatured() {
             <h2 class="text-2xl font-bold text-slate-900 sm:text-3xl dark:text-white">Productos destacados</h2>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Selección especial de nuestro catálogo</p>
           </div>
-          <NuxtLink to="/productos?isFeatured=true" class="hidden items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-800 dark:text-brand-400 dark:hover:text-brand-300 sm:flex">
+          <NuxtLink to="/productos" class="hidden items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-800 dark:text-brand-400 dark:hover:text-brand-300 sm:flex">
             Ver todos <ArrowRight class="h-4 w-4" />
           </NuxtLink>
         </div>

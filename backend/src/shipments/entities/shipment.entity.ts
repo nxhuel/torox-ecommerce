@@ -49,6 +49,10 @@ export class Shipment {
   @Column({ nullable: true, name: 'label_url' })
   labelUrl: string;
 
+  /** URL de rastreo en Envia.com para el cliente. */
+  @Column({ nullable: true, name: 'track_url' })
+  trackUrl: string;
+
   @Column({ type: 'enum', enum: ShipmentStatus, default: ShipmentStatus.PREPARING })
   status: ShipmentStatus;
 

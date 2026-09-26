@@ -356,6 +356,7 @@ export class EnviaProvider implements ShipmentProvider {
       carrierName: quote.carrierName,
       enviaId: String(data.shipmentId),
       labelUrl: data.label,
+      trackingUrl: data.trackUrl,
       events: [
         {
           status: ShipmentStatus.PREPARING,

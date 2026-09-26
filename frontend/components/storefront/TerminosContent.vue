@@ -48,8 +48,7 @@
     <p>
       Los envíos se realizan a todo el territorio argentino a través de empresas de logística
       tercerizadas. Los tiempos de entrega son estimados y pueden variar según la zona. El costo
-      de envío se calcula al momento de la compra según la dirección de entrega. Envío gratis en
-      compras superiores al monto indicado en el Sitio.
+      de envío se calcula al momento de la compra según la dirección de entrega.
     </p>
 
     <h3 class="pt-2">8. Derecho de Desistimiento</h3>

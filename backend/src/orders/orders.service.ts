@@ -20,9 +20,6 @@ import { FinanceService } from '../finance/finance.service';
 import { PromotionsService } from '../promotions/promotions.service';
 import { MailService } from '../mail/mail.service';
 
-// FREE_SHIPPING_THRESHOLD y SHIPPING_COST fijos ya no se usan:
-// el costo real lo provee Envia.com al crear la orden.
-const FREE_SHIPPING_THRESHOLD = 50000;
 
 @Injectable()
 export class OrdersService {
@@ -197,7 +194,8 @@ export class OrdersService {
       this.shipmentsService.findByOrder(id),
     ]);
 
-    return { ...order, payment, shipment };
+    const packageDetails = shipment ? await this.shipmentsService.getPackageDetails(order) : null
+    return { ...order, payment, shipment, packageDetails };
   }
 
   async findOneForUser(id: string, user: { id: string; role: string }) {
@@ -448,11 +446,6 @@ export class OrdersService {
         date: new Date().toISOString(),
       });
     }
-  }
-
-  private async getShippingCost(subtotal: number): Promise<number> {
-    // Fallback: envío gratis si supera el umbral
-    return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : 0;
   }
 
   private async nextOrderNumber(): Promise<string> {

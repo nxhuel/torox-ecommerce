@@ -111,7 +111,6 @@ export interface Cart {
   shippingCost: number
   discount: number
   total: number
-  freeShippingThreshold: number
   createdAt: string
   updatedAt: string
 }
@@ -173,6 +172,7 @@ export interface Shipment {
   events: ShipmentEvent[]
   enviaId?: string | null
   labelUrl?: string | null
+  trackUrl?: string | null
   shippedAt?: string | null
   deliveredAt?: string | null
   createdAt: string
@@ -204,6 +204,13 @@ export interface Order {
   items: OrderItem[]
   payment?: Payment | null
   shipment?: Shipment | null
+  packageDetails?: {
+    weightKg: number
+    widthCm: number
+    heightCm: number
+    lengthCm: number
+    declaredValue: number
+  } | null
   createdAt: string
   updatedAt: string
 }

@@ -280,7 +280,7 @@ const canDeliver = computed(() => selected.value?.status === 'SHIPPED')
             <div class="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm">
               <div class="flex justify-between text-slate-600"><span>Subtotal</span><span>{{ currency(selected.subtotal) }}</span></div>
               <div v-if="selected.discount > 0" class="flex justify-between text-emerald-600"><span>Descuento</span><span>-{{ currency(selected.discount) }}</span></div>
-              <div class="flex justify-between text-slate-600"><span>Envío</span><span>{{ selected.shippingCost === 0 ? 'Gratis' : currency(selected.shippingCost) }}</span></div>
+              <div class="flex justify-between text-slate-600"><span>Envío</span><span>{{ selected.shippingCost === 0 ? 'Sin costo' : currency(selected.shippingCost) }}</span></div>
               <div class="flex justify-between border-t border-slate-100 pt-2 text-base font-bold text-slate-900"><span>Total</span><span>{{ currency(selected.total) }}</span></div>
             </div>
           </div>
@@ -329,6 +329,36 @@ const canDeliver = computed(() => selected.value?.status === 'SHIPPED')
               <p v-else class="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-400">
                 Envío aún no generado
               </p>
+            </div>
+
+            <div>
+              <h3 class="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+                <Package class="h-4 w-4" /> Paquete (peso y medidas usados)
+              </h3>
+              <div v-if="selected.packageDetails" class="rounded-lg border border-slate-100 p-3 text-sm">
+                <div class="grid gap-1.5 sm:grid-cols-2">
+                  <div>
+                    <p class="text-xs text-slate-400">Peso total</p>
+                    <p class="font-medium text-slate-800">{{ selected.packageDetails.weightKg.toFixed(2) }} kg</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-slate-400">Valor declarado (seguro)</p>
+                    <p class="font-medium text-slate-800">{{ currency(selected.packageDetails.declaredValue) }}</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-slate-400">Ancho × Alto × Largo</p>
+                    <p class="font-medium text-slate-800">
+                      {{ selected.packageDetails.widthCm }} × {{ selected.packageDetails.heightCm }} × {{ selected.packageDetails.lengthCm }} cm
+                    </p>
+                  </div>
+                </div>
+                <p v-if="selected.shipment?.trackUrl" class="mt-2 text-xs text-slate-400">
+                  El cliente puede rastrear en:
+                  <a :href="selected.shipment.trackUrl" class="text-brand-600 hover:underline" target="_blank" rel="noopener">
+                    envía.com/rastreo
+                  </a>
+                </p>
+              </div>
             </div>
 
             <div>

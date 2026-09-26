@@ -4,8 +4,6 @@ import { Repository } from 'typeorm';
 import { Cart, CartItem } from './entities/cart.entity';
 import { ProductsService } from '../products/products.service';
 
-const FREE_SHIPPING_THRESHOLD = 50000;
-const SHIPPING_COST = 0;
 
 @Injectable()
 export class CartService {
@@ -102,9 +100,11 @@ export class CartService {
     const subtotal = (cart.items || []).reduce(
       (sum, item) => sum + Number(item.unitPrice) * item.quantity, 0,
     );
-    const shippingCost = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
+    // El costo de envío no se conoce hasta el checkout: se cotiza con Envia.com
+    // según la dirección del cliente. Acá queda en 0 y la UI lo muestra como "A cotizar".
+    const shippingCost = 0;
     const total = subtotal + shippingCost;
-    return { subtotal, shippingCost, discount: 0, total, freeShippingThreshold: FREE_SHIPPING_THRESHOLD };
+    return { subtotal, shippingCost, discount: 0, total };
   }
 
   async getCartWithTotals(userId?: string, sessionId?: string) {

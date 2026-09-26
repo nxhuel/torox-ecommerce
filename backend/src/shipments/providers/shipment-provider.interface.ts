@@ -27,6 +27,8 @@ export interface ShipmentCreationResult {
   enviaId?: string;
   /** URL del PDF de la etiqueta devuelta por Envia al generarla. */
   labelUrl?: string;
+  /** URL de rastreo de Envia.com para el cliente. */
+  trackingUrl?: string;
   carrierName?: string;
   events: { status: ShipmentStatus; date: Date; description: string }[];
 }

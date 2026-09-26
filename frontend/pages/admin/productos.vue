@@ -38,6 +38,10 @@ const form = reactive({
   isFeatured: false,
   isOnSale: false,
   isActive: true,
+  weightKg: null as number | null,
+  widthCm: null as number | null,
+  heightCm: null as number | null,
+  lengthCm: null as number | null,
 })
 
 // Descuento real ingresado (se conserva con decimales, sin redondear).
@@ -100,6 +104,10 @@ function openCreate() {
     isFeatured: false,
     isOnSale: false,
     isActive: true,
+    weightKg: null,
+    widthCm: null,
+    heightCm: null,
+    lengthCm: null,
   })
   uploading.value = false
   showModal.value = true
@@ -121,6 +129,10 @@ function openEdit(product: Product) {
     isFeatured: product.isFeatured,
     isOnSale: product.isOnSale,
     isActive: product.isActive,
+    weightKg: product.weightKg != null ? Number(product.weightKg) : null,
+    widthCm: product.widthCm != null ? Number(product.widthCm) : null,
+    heightCm: product.heightCm != null ? Number(product.heightCm) : null,
+    lengthCm: product.lengthCm != null ? Number(product.lengthCm) : null,
   })
   while (form.highlights.length < 2) form.highlights.push('')
   showModal.value = true
@@ -222,6 +234,10 @@ async function save() {
     isFeatured: form.isFeatured,
     isOnSale: (discountPercentageValue != null && discountPercentageValue > 0) || form.isOnSale,
     isActive: form.isActive,
+    weightKg: form.weightKg != null ? Number(form.weightKg) : undefined,
+    widthCm: form.widthCm != null ? Number(form.widthCm) : undefined,
+    heightCm: form.heightCm != null ? Number(form.heightCm) : undefined,
+    lengthCm: form.lengthCm != null ? Number(form.lengthCm) : undefined,
   }
 
   try {
@@ -460,11 +476,34 @@ function categoryName(id: string) {
         <label class="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
           <input v-model="form.isActive" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-brand-600" />
           Activo
-        </label>
-        <label class="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
+        </label>         <label class="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
           <input v-model="form.isOnSale" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-red-600" />
           En oferta
         </label>
+        <div class="sm:col-span-2 rounded-xl border border-slate-200 p-4">
+          <label class="label-base">Datos de envío (Envia.com)</label>
+          <p class="mb-3 text-xs text-slate-400">Peso y medidas del embalaje, usados para cotizar el envío.</p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label class="label-base">Peso del producto (kg)</label>
+              <input v-model.number="form.weightKg" type="number" step="any" min="0.001" class="input-base" placeholder="0,35" />
+              <p class="mt-1 text-xs text-slate-400">Ej: 0,35 kg para producto pequeño</p>
+            </div>
+            <div>
+              <label class="label-base">Ancho del embalaje (cm)</label>
+              <input v-model.number="form.widthCm" type="number" step="any" min="1" class="input-base" placeholder="15" />
+            </div>
+            <div>
+              <label class="label-base">Alto del embalaje (cm)</label>
+              <input v-model.number="form.heightCm" type="number" step="any" min="1" class="input-base" placeholder="15" />
+            </div>
+            <div>
+              <label class="label-base">Largo del embalaje (cm)</label>
+              <input v-model.number="form.lengthCm" type="number" step="any" min="1" class="input-base" placeholder="15" />
+              <p class="mt-1 text-xs text-slate-400">Pista: el largo de la caja</p>
+            </div>
+          </div>
+        </div>
       </div>
       <template #footer>
         <button class="btn-secondary" @click="showModal = false">Cancelar</button>
