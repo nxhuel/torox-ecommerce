@@ -115,6 +115,14 @@ const shippingCost = computed(() => {
   return quotedShippingCost.value ?? cart.cart.shippingCost
 })
 
+// Mismo cálculo que hace el backend al crear la orden:
+// subtotal − descuentos + envío cotizado.
+const displayTotal = computed(() => {
+  const subtotal = cart.cart?.subtotal || 0
+  const discount = cart.cart?.discount || 0
+  return Math.max(0, subtotal - discount + shippingCost.value)
+})
+
 // Cotiza el envío cuando el usuario completa CP y provincia en el paso 2
 async function fetchShippingQuote() {
   if (form.shippingMethod === 'PICKUP' || freeShipping.value) {
