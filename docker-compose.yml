@@ -47,6 +47,8 @@ services:
       ENVIA_ORIGIN_STATE: BA
       ENVIA_ORIGIN_POSTAL_CODE: '1824'
       ENVIA_WEBHOOK_URL: https://torox-ecommerce.seenode.app/api/webhooks/envia
+      # auth_token del webhook: firma HMAC de los webhooks de Envia (X-Webhook-Signature)
+      ENVIA_WEBHOOK_SECRET: 791e5db67d0de43198928e012cac970148521801f7d7a5c0b2d632fc031974e1
     ports:
       - '3000:3000'
     volumes:

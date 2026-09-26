@@ -6,6 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ShipmentsService } from './shipments.service';
 import { ShipmentsController } from './shipments.controller';
 import { EnviaWebhookController } from './envia-webhook.controller';
+import { WebhookIdempotencyService } from './webhook-idempotency.service';
 import { Shipment } from './entities/shipment.entity';
 import { EnviaProvider } from './providers/envia.provider';
 import { SHIPMENT_PROVIDER } from './providers/shipment-provider.interface';
@@ -22,6 +23,7 @@ import { ProductsModule } from '../products/products.module';
   controllers: [ShipmentsController, EnviaWebhookController],
   providers: [
     ShipmentsService,
+    WebhookIdempotencyService,
     EnviaProvider,
     {
       provide: SHIPMENT_PROVIDER,

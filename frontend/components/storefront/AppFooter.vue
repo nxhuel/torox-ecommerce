@@ -47,7 +47,7 @@ const ordersLink = computed(() => (auth.isAuthenticated ? '/cuenta/compras' : '/
           <li><NuxtLink :to="ordersLink" class="transition hover:text-white">Mis compras</NuxtLink></li>
           <li>
             <a
-              href="https://www.andreani.com/"
+              href="https://envia.com/rastreo"
               target="_blank"
               rel="noopener noreferrer"
               class="transition hover:text-white"

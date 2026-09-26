@@ -51,6 +51,9 @@ services:
       ENVIA_ORIGIN_CITY: Lanus
       ENVIA_ORIGIN_STATE: BA
       ENVIA_ORIGIN_POSTAL_CODE: '1824'
+      ENVIA_WEBHOOK_URL: https://<tu-dominio>/api/webhooks/envia
+      # auth_token del webhook, para validar X-Webhook-Signature (si se omite, no se valida)
+      ENVIA_WEBHOOK_SECRET: <auth_token-del-webhook>
     ports:
       - '3000:3000'
     volumes:

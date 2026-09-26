@@ -18,7 +18,7 @@ export const ORDER_STATUS_STYLES: Record<string, string> = {
 
 export const SHIPMENT_STATUS_LABELS: Record<string, string> = {
   PREPARING: 'Preparando',
-  PICKED_UP: 'Retirado por Andreani',
+  PICKED_UP: 'Retirado por el correo',
   IN_TRANSIT: 'En tránsito',
   OUT_FOR_DELIVERY: 'En reparto',
   DELIVERED: 'Entregado',

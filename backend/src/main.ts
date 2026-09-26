@@ -13,6 +13,9 @@ async function bootstrap() {
   try {
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       logger: ['log', 'error', 'warn', 'debug'],
+      // Keeps the raw (unparsed) body on `req.rawBody` so webhook signatures can be
+      // verified against the exact bytes Envia hashed (see EnviaWebhookController).
+      rawBody: true,
     });
 
     // --- Security headers via Helmet ---

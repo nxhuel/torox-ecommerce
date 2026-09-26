@@ -264,7 +264,7 @@ function isVideo(url: string) {
             <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card dark:bg-dark-800">
               <Truck class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" />
               <div>
-                <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">Envío simulado por Andreani</p>
+                <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">Envío por el correo</p>
               </div>
             </div>
             <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card dark:bg-dark-800">
