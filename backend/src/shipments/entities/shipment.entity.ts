@@ -38,8 +38,16 @@ export class Shipment {
   @Column({ unique: true, name: 'tracking_number' })
   trackingNumber: string;
 
-  @Column({ default: 'ANDREANI (SIMULADO)' })
+  @Column({ default: 'Envia.com' })
   carrier: string;
+
+  /** ID interno del envío en Envia.com (shipmentId). Se usa para sincronizar el estado. */
+  @Column({ nullable: true, name: 'envia_id' })
+  enviaId: string;
+
+  /** URL del PDF de la etiqueta devuelta por Envia al generar el envío. */
+  @Column({ nullable: true, name: 'label_url' })
+  labelUrl: string;
 
   @Column({ type: 'enum', enum: ShipmentStatus, default: ShipmentStatus.PREPARING })
   status: ShipmentStatus;

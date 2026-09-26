@@ -20,8 +20,9 @@ import { FinanceService } from '../finance/finance.service';
 import { PromotionsService } from '../promotions/promotions.service';
 import { MailService } from '../mail/mail.service';
 
+// FREE_SHIPPING_THRESHOLD y SHIPPING_COST fijos ya no se usan:
+// el costo real lo provee Envia.com al crear la orden.
 const FREE_SHIPPING_THRESHOLD = 50000;
-const SHIPPING_COST = 0;
 
 @Injectable()
 export class OrdersService {
@@ -76,7 +77,14 @@ export class OrdersService {
     const shippingCost =
       dto.shippingMethod === ShippingMethod.PICKUP || freeShipping
         ? 0
-        : this.getShippingCost(subtotal);
+        : await this.shipmentsService.quoteForOrderData({
+            province: dto.shippingAddress.province,
+            postalCode: dto.shippingAddress.postalCode,
+            items: cart.items.map((i) => ({
+              productId: i.productId,
+              quantity: i.quantity,
+            })),
+          });
     const total = subtotal - discount + shippingCost;
 
     const order = this.orderRepo.create({
@@ -397,7 +405,7 @@ export class OrdersService {
       order,
       NotificationType.SHIPMENT_STATUS,
       'Envío generado',
-      'Tu envío fue generado en Andreani y está en preparación.',
+      'Tu envío fue generado y está en preparación.',
       `/pedidos/${order.id}`,
     );
     await this.mailService.sendPaymentApproved(order.customerEmail, order.orderNumber, order.total);
@@ -442,8 +450,9 @@ export class OrdersService {
     }
   }
 
-  private getShippingCost(subtotal: number): number {
-    return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
+  private async getShippingCost(subtotal: number): Promise<number> {
+    // Fallback: envío gratis si supera el umbral
+    return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : 0;
   }
 
   private async nextOrderNumber(): Promise<string> {

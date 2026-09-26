@@ -1,23 +1,33 @@
 import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { HttpModule } from '@nestjs/axios';
+import { ConfigModule } from '@nestjs/config';
 import { ShipmentsService } from './shipments.service';
 import { ShipmentsController } from './shipments.controller';
+import { EnviaWebhookController } from './envia-webhook.controller';
 import { Shipment } from './entities/shipment.entity';
-import { MockShipmentProvider } from './providers/mock-shipment.provider';
+import { EnviaProvider } from './providers/envia.provider';
 import { SHIPMENT_PROVIDER } from './providers/shipment-provider.interface';
+import { ProductsModule } from '../products/products.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Shipment]), PassportModule.register({ defaultStrategy: 'jwt' })],
-  controllers: [ShipmentsController],
+  imports: [
+    TypeOrmModule.forFeature([Shipment]),
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    HttpModule,
+    ConfigModule,
+    ProductsModule,
+  ],
+  controllers: [ShipmentsController, EnviaWebhookController],
   providers: [
     ShipmentsService,
-    MockShipmentProvider,
+    EnviaProvider,
     {
       provide: SHIPMENT_PROVIDER,
-      useClass: MockShipmentProvider,
+      useClass: EnviaProvider,
     },
   ],
-  exports: [ShipmentsService],
+  exports: [ShipmentsService, EnviaProvider],
 })
 export class ShipmentsModule {}

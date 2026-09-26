@@ -86,6 +86,23 @@ export class Product {
   @Column({ default: 0, name: 'sales_count' })
   salesCount: number;
 
+  // ─── Campos de logística para cotización con Envia.com ───────────────────
+  /** Peso real del producto en kilogramos (usado para cotizar el envío). */
+  @Column({ type: 'decimal', precision: 8, scale: 3, default: 0.5, name: 'weight_kg', transformer: decimalToNumber })
+  weightKg: number;
+
+  /** Ancho del embalaje en centímetros. */
+  @Column({ type: 'decimal', precision: 7, scale: 2, default: 15, name: 'width_cm', transformer: decimalToNumber })
+  widthCm: number;
+
+  /** Alto del embalaje en centímetros. */
+  @Column({ type: 'decimal', precision: 7, scale: 2, default: 10, name: 'height_cm', transformer: decimalToNumber })
+  heightCm: number;
+
+  /** Largo del embalaje en centímetros. */
+  @Column({ type: 'decimal', precision: 7, scale: 2, default: 15, name: 'length_cm', transformer: decimalToNumber })
+  lengthCm: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

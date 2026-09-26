@@ -193,6 +193,24 @@ export const shipmentsService = {
     api().api<Shipment>(`/shipments/tracking/${trackingNumber}`),
   all: () => api().api<Shipment[]>('/shipments'),
   advance: (id: string) => api().api<Shipment>(`/shipments/${id}/advance`, { method: 'POST' }),
+  /**
+   * Cotiza el costo de envío en tiempo real usando Envia.com.
+   * Se llama desde el checkout al ingresar la dirección.
+   */
+  quote: (params: { province: string; city?: string; postalCode: string; weightKg?: number }) =>
+    api().api<{
+      cost: number
+      currency?: string
+      carrierName?: string
+      serviceDescription?: string
+      deliveryEstimate?: string
+    }>(
+      `/shipments/quote?province=${encodeURIComponent(params.province)}${params.city ? `&city=${encodeURIComponent(params.city)}` : ''}&postalCode=${params.postalCode}${params.weightKg ? `&weightKg=${params.weightKg}` : ''}`,
+    ),
+  /** Obtiene la URL de la etiqueta PDF de Envia.com (admin). */
+  label: (id: string) => api().api<{ url: string | null }>(`/shipments/${id}/label`),
+  /** Sincroniza el estado del envío con la API de Envia.com (admin). */
+  sync: (id: string) => api().api<Shipment>(`/shipments/${id}/sync`, { method: 'POST' }),
 }
 
 /* ---------- Finance ---------- */

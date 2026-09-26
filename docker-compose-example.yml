@@ -39,6 +39,18 @@ services:
       JWT_SECRET: torox_super_secret_jwt_key_2024_change_in_production
       JWT_EXPIRES_IN: 7d
       FRONTEND_URL: http://localhost:3001
+      # ── Envia.com (envíos) ──────────────────────────────────────────────
+      ENVIA_API_KEY: 721059fb9d29ca57c7f410a04643edd3cdae00f1024fe2003b62cbf45265d7ae
+      ENVIA_API_BASE: https://api.envia.com
+      ENVIA_CARRIERS: correoArgentino,andreani,oca
+      ENVIA_ORIGIN_NAME: TOROX
+      ENVIA_ORIGIN_COMPANY: TOROX
+      ENVIA_ORIGIN_PHONE: '+54 9 11 7138-3512'
+      ENVIA_ORIGIN_EMAIL: toroxseguridad@gmail.com
+      ENVIA_ORIGIN_STREET: 'Bouchard 2092'
+      ENVIA_ORIGIN_CITY: Lanus
+      ENVIA_ORIGIN_STATE: BA
+      ENVIA_ORIGIN_POSTAL_CODE: '1824'
     ports:
       - '3000:3000'
     volumes:

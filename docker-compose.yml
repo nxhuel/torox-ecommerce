@@ -32,6 +32,21 @@ services:
       RESEND_API_KEY: re_eghKDyoR_E6J2BGrpP1bQe2gmJ8aTv4vw
       MAIL_FROM: "TOROX <no-reply@torox.com.ar>"
       MAIL_REPLY_TO: toroxseguridad@gmail.com
+      # ── Envia.com (envíos) ──────────────────────────────────────────────
+      ENVIA_API_KEY: 721059fb9d29ca57c7f410a04643edd3cdae00f1024fe2003b62cbf45265d7ae
+      ENVIA_API_BASE: https://api.envia.com
+      ENVIA_QUERIES_BASE: https://queries.envia.com
+      ENVIA_CARRIERS: correoArgentino,andreani,oca
+      # Origen (retiro): Lanús, Buenos Aires
+      ENVIA_ORIGIN_NAME: TOROX
+      ENVIA_ORIGIN_COMPANY: TOROX
+      ENVIA_ORIGIN_PHONE: '+54 9 11 7138-3512'
+      ENVIA_ORIGIN_EMAIL: toroxseguridad@gmail.com
+      ENVIA_ORIGIN_STREET: 'Bouchard 2092'
+      ENVIA_ORIGIN_CITY: Lanus
+      ENVIA_ORIGIN_STATE: BA
+      ENVIA_ORIGIN_POSTAL_CODE: '1824'
+      ENVIA_WEBHOOK_URL: https://torox-ecommerce.seenode.app/api/webhooks/envia
     ports:
       - '3000:3000'
     volumes:

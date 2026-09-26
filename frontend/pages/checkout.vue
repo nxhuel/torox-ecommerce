@@ -11,10 +11,11 @@ import {
   Home,
   Landmark,
   ExternalLink,
+  Package,
 } from 'lucide-vue-next'
 import { useCartStore } from '~/stores/cart'
 import { useAuthStore } from '~/stores/auth'
-import { ordersService } from '~/services'
+import { ordersService, shipmentsService } from '~/services'
 import { useFormat } from '~/composables/useFormat'
 import { useApi } from '~/composables/useApi'
 
@@ -29,6 +30,12 @@ const step = ref(1)
 const processing = ref(false)
 const error = ref('')
 const redirectingToMp = ref(false)
+
+// ── Cotización de envío ───────────────────────────────────────────────
+/** Costo de envío cotizado en tiempo real por Envia.com */
+const quotedShippingCost = ref<number | null>(null)
+const quotingShipping = ref(false)
+const quoteError = ref('')
 
 const form = reactive({
   customerName: '',
@@ -104,11 +111,35 @@ const freeShipping = computed(() => {
 const shippingCost = computed(() => {
   if (!cart.cart) return 0
   if (form.shippingMethod === 'PICKUP' || freeShipping.value) return 0
-  return cart.cart.shippingCost
+  // Si ya cotizamos con Envia.com, usar ese valor; si no, usar el del carrito
+  return quotedShippingCost.value ?? cart.cart.shippingCost
 })
 
-// El total lo calcula el backend: subtotal + shippingCost (el descuento ya está aplicado en el subtotal)
-const total = computed(() => (cart.cart?.total || 0))
+// Cotiza el envío cuando el usuario completa CP y provincia en el paso 2
+async function fetchShippingQuote() {
+  if (form.shippingMethod === 'PICKUP' || freeShipping.value) {
+    quotedShippingCost.value = 0
+    return
+  }
+  if (!form.postalCode || !form.province) return
+
+  quotingShipping.value = true
+  quoteError.value = ''
+  quotedShippingCost.value = null
+  try {
+    const result = await shipmentsService.quote({
+      province: form.province,
+      city: form.city.trim() || undefined,
+      postalCode: form.postalCode,
+    })
+    quotedShippingCost.value = result.cost ?? 0
+  } catch {
+    quoteError.value = 'No se pudo cotizar el envío. Se calculará al confirmar el pedido.'
+    quotedShippingCost.value = null
+  } finally {
+    quotingShipping.value = false
+  }
+}
 
 function validateStep(current: number): boolean {
   error.value = ''
@@ -128,6 +159,8 @@ function validateStep(current: number): boolean {
         error.value = 'Completá todos los campos de la dirección de envío.'
         return false
       }
+      // Cotizar envío al pasar al paso 3
+      fetchShippingQuote()
     }
   }
   if (current === 4) {
@@ -319,11 +352,10 @@ async function placeOrderWithMercadoPago() {
           </div>
         </div>
 
-        <!-- Step 3: Shipping method -->
         <div v-if="step === 3" class="card animate-fade-in-up p-6">
           <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            <Truck class="h-4 w-4" /> Envío por <a href='https://www.andreani.com/' target="_blank"
-              class="underline ">Andreani</a>
+            <Truck class="h-4 w-4" /> Envío por <a href='https://www.envia.com/' target="_blank"
+              class="underline">Envia.com</a>
           </div>
           <h2 class="mb-5 text-lg font-bold text-slate-900">Método de envío</h2>
           <div class="space-y-3">
@@ -333,7 +365,19 @@ async function placeOrderWithMercadoPago() {
                 class="mt-1 h-4 w-4 text-brand-600" />
               <span class="flex-1">
                 <span class="flex items-center gap-2 font-semibold text-slate-800">
-                  <Home class="h-4 w-4 text-brand-600" /> Envío a domicilio
+                  <Home class="h-4 w-4 text-brand-600" /> Envío a domicilio por Envia.com
+                </span>
+                <!-- Cotización en tiempo real -->
+                <span class="mt-1 block text-sm">
+                  <span v-if="quotingShipping" class="flex items-center gap-1.5 text-slate-500">
+                    <Loader2 class="h-3.5 w-3.5 animate-spin" /> Calculando costo de envío...
+                  </span>
+                  <span v-else-if="freeShipping" class="font-semibold text-emerald-600">Envío gratis</span>
+                  <span v-else-if="quotedShippingCost !== null" class="font-semibold text-slate-800">
+                    {{ currency(quotedShippingCost) }}
+                  </span>
+                  <span v-else-if="quoteError" class="text-xs text-amber-600">{{ quoteError }}</span>
+                  <span v-else class="text-slate-400 text-xs">El costo se calculará con la dirección ingresada</span>
                 </span>
               </span>
             </label>
@@ -370,14 +414,14 @@ async function placeOrderWithMercadoPago() {
 
             <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div class="flex items-start gap-3">
-                <Landmark class="mt-0.5 h-5 w-5 text-slate-400" />
+                <Package class="mt-0.5 h-5 w-5 text-slate-400" />
                 <div class="text-xs text-slate-600">
                   <p class="font-medium">Información del pedido</p>
                   <p class="mt-1">
-                    {{ cart.cart?.items?.length }} artículo{{ cart.cart?.items?.length === 1 ? '' : 's' }} — Total: {{ currency(total) }}
+                    {{ cart.cart?.items?.length }} artículo{{ cart.cart?.items?.length === 1 ? '' : 's' }} — Total: {{ currency(displayTotal) }}
                   </p>
                   <p class="mt-1">
-                    El envío será gestionado por <a href='https://www.andreani.com/' target="_blank" class="underline">Andreani</a>
+                    El envío será gestionado por <a href='https://www.envia.com/' target="_blank" class="underline">Envia.com</a>
                   </p>
                 </div>
               </div>
@@ -444,7 +488,7 @@ async function placeOrderWithMercadoPago() {
           </div>
           <div class="flex justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
             <span>Total a pagar</span>
-            <span>{{ currency(total) }}</span>
+            <span>{{ currency(displayTotal) }}</span>
           </div>
         </div>
       </aside>

@@ -69,6 +69,11 @@ export interface Product {
   finalPrice: number
   isInStock: boolean
   favoriteId?: string
+  // Logística (Envia.com)
+  weightKg?: number
+  widthCm?: number
+  heightCm?: number
+  lengthCm?: number
 }
 
 export interface Paginated<T> {
@@ -166,6 +171,8 @@ export interface Shipment {
   status: ShipmentStatus
   estimatedDelivery: string
   events: ShipmentEvent[]
+  enviaId?: string | null
+  labelUrl?: string | null
   shippedAt?: string | null
   deliveredAt?: string | null
   createdAt: string

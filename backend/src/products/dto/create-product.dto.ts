@@ -51,4 +51,14 @@ export class CreateProductDto {
   @IsOptional() @IsBoolean() isOnSale?: boolean;
   @IsOptional() @IsNumber() @Min(0) @Max(100) discountPercentage?: number | null;
   @IsOptional() @IsBoolean() isActive?: boolean;
+
+  // ─── Logística (Envia.com) ──────────────────────────────────────────────
+  /** Peso real en kg (usado para cotizar con Envia.com). */
+  @IsOptional() @IsNumber() @Min(0.001) weightKg?: number;
+  /** Ancho del embalaje en cm. */
+  @IsOptional() @IsNumber() @Min(1) widthCm?: number;
+  /** Alto del embalaje en cm. */
+  @IsOptional() @IsNumber() @Min(1) heightCm?: number;
+  /** Largo del embalaje en cm. */
+  @IsOptional() @IsNumber() @Min(1) lengthCm?: number;
 }
