@@ -21,8 +21,8 @@ export class PromotionsService {
   async create(dto: CreatePromotionDto): Promise<Promotion> {
     const promotion = this.repo.create({
       ...dto,
-      startDate: new Date(dto.startDate),
-      endDate: new Date(dto.endDate),
+      startDate: this.parseDate(dto.startDate),
+      endDate: this.parseDate(dto.endDate, true),
     });
     return this.repo.save(promotion);
   }
@@ -45,8 +45,8 @@ export class PromotionsService {
   async update(id: string, dto: UpdatePromotionDto): Promise<Promotion> {
     const promotion = await this.findOne(id);
     const data = { ...dto } as any;
-    if (data.startDate) data.startDate = new Date(data.startDate);
-    if (data.endDate) data.endDate = new Date(data.endDate);
+    if (data.startDate) data.startDate = this.parseDate(data.startDate);
+    if (data.endDate) data.endDate = this.parseDate(data.endDate, true);
     Object.assign(promotion, data);
     return this.repo.save(promotion);
   }
@@ -54,6 +54,18 @@ export class PromotionsService {
   async remove(id: string): Promise<void> {
     const promotion = await this.findOne(id);
     await this.repo.remove(promotion);
+  }
+
+  /**
+   * A date-only value (`2026-11-04`) means the WHOLE day. If it were parsed as
+   * midnight, a promotion whose end date is today would already look inactive
+   * from 00:00 — and in Argentina (UTC-3) from 21:00 of the previous day.
+   */
+  private parseDate(value: string, endOfDay = false): Date {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}`);
+    }
+    return new Date(value);
   }
 
   /**

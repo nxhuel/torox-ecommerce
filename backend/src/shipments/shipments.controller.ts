@@ -2,19 +2,29 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
+  Body,
   Param,
   Query,
   UseGuards,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ShipmentsService } from './shipments.service';
+import { EnviaProvider } from './providers/envia.provider';
+import { QuoteShipmentDto } from './dto/quote-shipment.dto';
+import { OriginBranchDto } from './dto/origin-branch.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('shipments')
 export class ShipmentsController {
-  constructor(private readonly service: ShipmentsService) {}
+  constructor(
+    private readonly service: ShipmentsService,
+    private readonly envia: EnviaProvider,
+  ) {}
 
   // ─── Endpoints públicos ──────────────────────────────────────────────────────
 
@@ -26,35 +36,119 @@ export class ShipmentsController {
 
   /**
    * Cotización de envío en tiempo real con Envia.com.
-   * Se llama desde el checkout cuando el cliente ingresa su CP y provincia.
+   * Devuelve TODAS las opciones disponibles (carrier + servicio + modalidad)
+   * con su precio real, para que el comprador elija.
    *
-   * GET /shipments/quote?province=Buenos+Aires&city=Cordoba&postalCode=5000&weightKg=1.5
+   * POST /shipments/quote
+   * { province, city, postalCode, address, number, items: [{ productId, quantity }] }
    */
-  @Get('quote')
-  async quote(
-    @Query('province') province: string,
-    @Query('postalCode') postalCode: string,
+  @Post('quote')
+  async quote(@Body() dto: QuoteShipmentDto) {
+    const options = await this.service.quoteOptions({
+      province: dto.province,
+      city: dto.city,
+      postalCode: dto.postalCode,
+      address: dto.address,
+      number: dto.number,
+      items: dto.items,
+    });
+    return {
+      options,
+      cost: options.length ? Math.min(...options.map((o) => o.cost)) : 0,
+      currency: options[0]?.currency ?? 'ARS',
+    };
+  }
+
+  /**
+   * Sucursales de un carrier cerca de una dirección (retiro en sucursal).
+   * GET /shipments/branches?carrier=andreani&type=2&zipcode=1824&city=Lanus
+   */
+  @Get('branches')
+  async branches(
+    @Query('carrier') carrier: string,
+    @Query('type') type?: string,
+    @Query('zipcode') zipcode?: string,
     @Query('city') city?: string,
-    @Query('weightKg') weightKg?: string,
-    @Query('widthCm') widthCm?: string,
-    @Query('heightCm') heightCm?: string,
-    @Query('lengthCm') lengthCm?: string,
+    @Query('state') state?: string,
   ) {
-    if (!province || !postalCode) {
-      throw new BadRequestException('province y postalCode son requeridos');
+    if (!carrier) {
+      throw new BadRequestException('carrier es requerido');
     }
-    return this.service.quote({
-      provinceName: province,
+    const branchType = type === '1' || type === '2' || type === '3' ? (Number(type) as 1 | 2 | 3) : 3;
+    return this.envia.getBranches({
+      carrier,
+      type: branchType,
+      zipcode,
       city,
-      postalCode,
-      weightKg: weightKg ? parseFloat(weightKg) : undefined,
-      widthCm: widthCm ? parseFloat(widthCm) : undefined,
-      heightCm: heightCm ? parseFloat(heightCm) : undefined,
-      lengthCm: lengthCm ? parseFloat(lengthCm) : undefined,
+      state,
     });
   }
 
   // ─── Endpoints de admin ──────────────────────────────────────────────────────
+
+  /**
+   * Datos del mapa: dirección de TOROX (pin azul) + sucursales de Envia
+   * cercanas (pines rojos).
+   */
+  @Get('map')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  mapData(
+    @Query('carrier') carrier?: string,
+    @Query('type') type?: string,
+    @Query('limit') limit?: string,
+    @Query('radiusKm') radiusKm?: string,
+  ) {
+    const branchType = type === '1' || type === '2' || type === '3' ? (Number(type) as 1 | 2 | 3) : 3;
+    return this.service.getMapData({
+      carrier,
+      type: branchType,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      radiusKm: radiusKm ? parseInt(radiusKm, 10) : undefined,
+    });
+  }
+
+  /** Carriers disponibles en Argentina (para los filtros del mapa). */
+  @Get('carriers')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  carriers() {
+    return this.envia.getCarriers();
+  }
+
+  /**
+   * Define la sucursal de Envia donde se dejan los paquetes (origen de los
+   * envíos) para la paquetería de esa sucursal.
+   */
+  @Post('origin-branch')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  setOriginBranch(@Body() dto: OriginBranchDto) {
+    return this.service.setOriginBranch({
+      branchCode: dto.branchCode,
+      branchId: dto.branchId,
+      carrier: dto.carrier,
+      carrierName: dto.carrierName,
+      reference: dto.reference,
+      type: dto.type ?? 'ORIGIN',
+      address: dto.address ?? {},
+      distanceKm: dto.distanceKm,
+      phone: dto.phone,
+      hours: dto.hours,
+    });
+  }
+
+  /**
+   * Vuelve a usar la dirección del .env como origen de los envíos.
+   * `?carrier=oca` borra sólo el origen de esa paquetería.
+   */
+  @Delete('origin-branch')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async clearOriginBranch(@Query('carrier') carrier?: string) {
+    await this.service.clearOriginBranch(carrier);
+    return { cleared: true, carrier: carrier ?? null };
+  }
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -68,6 +162,17 @@ export class ShipmentsController {
   @Roles('ADMIN')
   findByOrder(@Param('orderId') orderId: string) {
     return this.service.findByOrder(orderId);
+  }
+
+  /**
+   * Genera la guía en Envia.com para un pedido (o reintenta si falló al
+   * aprobarse el pago). El carrier y el servicio son los que eligió el comprador.
+   */
+  @Post('order/:orderId/generate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  generateForOrder(@Param('orderId') orderId: string) {
+    return this.service.createForOrderById(orderId);
   }
 
   @Post(':id/advance')
@@ -84,6 +189,21 @@ export class ShipmentsController {
   async getLabel(@Param('id') id: string) {
     const url = await this.service.getLabelUrl(id);
     return { url };
+  }
+
+  /**
+   * Descarga la etiqueta PDF de Enva como adjunto (TORX-000123-etiqueta.pdf).
+   * El PDF vive en los servidores de Envia: el backend lo trae y lo devuelve.
+   */
+  @Get(':id/label/file')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async downloadLabel(@Param('id') id: string, @Res() res: Response) {
+    const { buffer, filename } = await this.service.getLabelFile(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
   }
 
   /** Sincroniza el estado del envío consultando la API de Envia. */

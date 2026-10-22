@@ -9,6 +9,8 @@ import {
   MapPin,
   CreditCard,
   ChevronRight,
+  Printer,
+  Download,
 } from 'lucide-vue-next'
 import type { Order } from '~/types'
 import { ordersService, shipmentsService } from '~/services'
@@ -37,6 +39,7 @@ const limit = 10
 const selected = ref<Order | null>(null)
 const detailLoading = ref(false)
 const actionLoading = ref(false)
+const downloading = ref(false)
 const rejectReason = ref('')
 
 const statusOptions = [
@@ -108,6 +111,51 @@ const rejectPayment = () =>
 const advanceShipment = () =>
   selected.value?.shipment &&
   runAction(() => shipmentsService.advance(selected.value!.shipment!.id), 'Envío avanzado')
+
+/** Genera (o reintenta) la guía en Envia.com para este pedido. */
+const generateLabel = () =>
+  selected.value &&
+  runAction(
+    () => shipmentsService.generateForOrder(selected.value!.id),
+    'Guía generada en Envia.com',
+  )
+
+/** Abre el PDF de la etiqueta en una pestaña nueva. */
+async function printLabel() {
+  if (!selected.value?.shipment) return
+  try {
+    const { url } = await shipmentsService.label(selected.value.shipment.id)
+    if (!url) {
+      toast.error('Envia no devolvió la etiqueta del envío.')
+      return
+    }
+    window.open(url, '_blank', 'noopener')
+  } catch (error: any) {
+    toast.error(error.message)
+  }
+}
+
+/** Descarga la etiqueta como PDF (TORX-000123-etiqueta.pdf). */
+async function downloadLabel() {
+  if (!selected.value?.shipment) return
+  downloading.value = true
+  try {
+    const blob = await shipmentsService.downloadLabel(selected.value.shipment.id)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${selected.value.orderNumber}-etiqueta.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    toast.success('Etiqueta descargada')
+  } catch (error: any) {
+    toast.error(error.message || 'No se pudo descargar la etiqueta')
+  } finally {
+    downloading.value = false
+  }
+}
 
 const changeOrderStatus = (next: string) =>
   selected.value && runAction(() => ordersService.updateStatus(selected.value!.id, next), 'Estado actualizado')
@@ -272,6 +320,7 @@ const canDeliver = computed(() => selected.value?.status === 'SHIPPED')
                 </div>
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-semibold text-slate-800">{{ item.name }}</p>
+                  <p v-if="item.variantName" class="text-xs text-slate-500">{{ item.variantName }}</p>
                   <p class="text-xs text-slate-400">{{ item.quantity }} × {{ currency(item.unitPrice) }}</p>
                 </div>
                 <p class="shrink-0 text-sm font-bold text-slate-900">{{ currency(item.subtotal) }}</p>
@@ -302,6 +351,35 @@ const canDeliver = computed(() => selected.value?.status === 'SHIPPED')
               </div>
             </div>
 
+            <div v-if="selected.shippingOption">
+              <h3 class="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+                <Truck class="h-4 w-4" /> Opción de envío elegida
+              </h3>
+              <div class="rounded-lg border border-slate-100 p-3 text-sm">
+                <p class="font-semibold text-slate-800">Entrega a domicilio</p>
+                <p v-if="selected.shippingOption" class="text-slate-600">
+                  {{ selected.shippingOption.carrierName }} —
+                  {{ selected.shippingOption.serviceDescription || selected.shippingOption.service }}
+                </p>
+                <p v-if="selected.shippingOption" class="text-xs text-slate-400">
+                  {{ selected.shippingOption.dropOffDescription || `Modalidad ${selected.shippingOption.dropOff}` }}
+                  <template v-if="selected.shippingOption.deliveryEstimate">
+                    · {{ selected.shippingOption.deliveryEstimate }}
+                  </template>
+                  · {{ currency(selected.shippingOption.cost) }}
+                </p>
+                <p v-if="selected.shippingOrigin?.address" class="mt-2 border-t border-slate-100 pt-2 text-xs text-slate-500">
+                  Sale desde: {{ selected.shippingOrigin.address.street }}
+                  <template v-if="selected.shippingOrigin.address.number">
+                    {{ selected.shippingOrigin.address.number }}
+                  </template>
+                  <template v-if="selected.shippingOrigin.address.city">
+                    , {{ selected.shippingOrigin.address.city }}
+                  </template>
+                </p>
+              </div>
+            </div>
+
             <div>
               <h3 class="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-500">
                 <Truck class="h-4 w-4" /> Envío
@@ -316,19 +394,53 @@ const canDeliver = computed(() => selected.value?.status === 'SHIPPED')
                 <p class="mt-1 text-xs text-slate-400">
                   {{ selected.shipment.carrier }} • Entrega estimada {{ dateTime(selected.shipment.estimatedDelivery) }}
                 </p>
+                <p v-if="selected.shipment.originAddress" class="mt-1 text-xs text-slate-500">
+                  Dejá el paquete en: {{ selected.shipment.originAddress }}
+                </p>
+                <p v-if="selected.shipment.branchAddress" class="mt-1 text-xs text-slate-500">
+                  Sucursal de retiro: {{ selected.shipment.branchAddress }}
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <button
+                    v-if="selected.shipment.labelUrl"
+                    class="btn-secondary !py-1.5 !text-xs"
+                    @click="printLabel"
+                  >
+                    <Printer class="h-3.5 w-3.5" />
+                    Imprimir etiqueta
+                  </button>
+                  <button
+                    v-if="selected.shipment.labelUrl"
+                    class="btn-secondary !py-1.5 !text-xs"
+                    :disabled="downloading"
+                    @click="downloadLabel"
+                  >
+                    <Download class="h-3.5 w-3.5" />
+                    Descargar PDF
+                  </button>
+                  <button
+                    v-if="nextShipment"
+                    class="btn-secondary !py-1.5 !text-xs"
+                    :disabled="actionLoading"
+                    @click="advanceShipment"
+                  >
+                    <Truck class="h-3.5 w-3.5" />
+                    Avanzar a {{ SHIPMENT_STATUS_LABELS[nextShipment] }}
+                  </button>
+                </div>
+              </div>
+              <div v-else class="rounded-lg border border-dashed border-slate-200 p-3">
+                <p class="text-sm text-slate-400">Envío aún no generado</p>
                 <button
-                  v-if="nextShipment"
-                  class="btn-secondary mt-3 !py-1.5 !text-xs"
+                  v-if="selected.shippingMethod !== 'PICKUP'"
+                  class="btn-secondary mt-2 !py-1.5 !text-xs"
                   :disabled="actionLoading"
-                  @click="advanceShipment"
+                  @click="generateLabel"
                 >
-                  <Truck class="h-3.5 w-3.5" />
-                  Avanzar a {{ SHIPMENT_STATUS_LABELS[nextShipment] }}
+                  <Package class="h-3.5 w-3.5" />
+                  Generar guía en Envia.com
                 </button>
               </div>
-              <p v-else class="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-400">
-                Envío aún no generado
-              </p>
             </div>
 
             <div>

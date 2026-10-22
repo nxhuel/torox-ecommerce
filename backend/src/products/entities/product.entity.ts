@@ -5,16 +5,28 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   AfterLoad,
 } from 'typeorm';
 import { Category } from '../../categories/entities/category.entity';
+import { ProductVariant } from './product-variant.entity';
 import { SpecGroup } from '../product-specs.types';
 
 const decimalToNumber = {
   to: (value?: number | null) => value,
   from: (value?: string | null) => (value == null ? value : Number(value)),
 };
+
+/** Active promotion attached to a product when it is listed or fetched. */
+export interface ProductPromotion {
+  id: string;
+  name: string;
+  type: string;
+  value: number;
+  startDate: Date | string;
+  endDate: Date | string;
+}
 
 @Entity('products')
 export class Product {
@@ -58,6 +70,16 @@ export class Product {
 
   @Column({ type: 'jsonb', default: [], name: 'images' })
   images: string[];
+
+  /**
+   * Label of the variation axis, e.g. "Color". Variants only exist when the
+   * product has more than one option to choose from.
+   */
+  @Column({ type: 'varchar', nullable: true, name: 'variant_name' })
+  variantName: string | null;
+
+  @OneToMany(() => ProductVariant, (variant) => variant.product, { cascade: true })
+  variants: ProductVariant[];
 
   @Column({ type: 'jsonb', nullable: true })
   specifications: Record<string, string>;
@@ -113,18 +135,54 @@ export class Product {
   // included in JSON serialization (class getters are not).
   finalPrice!: number;
   isInStock!: boolean;
+  /** Active promotion that applies to this product (set by ProductsService). */
+  promotion: ProductPromotion | null = null;
 
   @AfterLoad()
   computeDerived(): void {
-    const price = Number(this.price);
-    const discount = Number(this.discountPercentage);
     // `price` is the list price; the storefront shows it crossed out and
     // `finalPrice` as the price to pay whenever a discount is applied.
-    if (this.isOnSale && discount > 0 && discount < 100) {
-      this.finalPrice = Math.round(price * (1 - discount / 100) * 100) / 100;
-    } else {
-      this.finalPrice = price;
-    }
+    this.finalPrice = this.computeBasePrice();
     this.isInStock = this.stock > 0;
+  }
+
+  /** Price after the product's own discount, before any promotion. */
+  private computeBasePrice(): number {
+    const price = Number(this.price);
+    const discount = Number(this.discountPercentage);
+    if (this.isOnSale && discount > 0 && discount < 100) {
+      return Math.round(price * (1 - discount / 100) * 100) / 100;
+    }
+    return price;
+  }
+
+  /**
+   * Applies an active promotion on the list price. While a promotion is
+   * running it takes precedence over the product's manual discount, so the
+   * percentage shown in the promo banner always matches the final price.
+   */
+  applyPromotion(promotion: ProductPromotion | null): void {
+    this.promotion = promotion;
+    if (!promotion) {
+      this.finalPrice = this.computeBasePrice();
+      return;
+    }
+
+    const listPrice = Number(this.price);
+    const value = Number(promotion.value) || 0;
+    // FREE_SHIPPING (and unknown types) don't change the product price.
+    let finalPrice = this.computeBasePrice();
+
+    switch (promotion.type) {
+      case 'PERCENTAGE_DISCOUNT':
+        finalPrice = listPrice * (1 - Math.min(Math.max(value, 0), 100) / 100);
+        break;
+      case 'FIXED_DISCOUNT':
+      case 'SPECIAL_OFFER':
+        finalPrice = Math.max(0, listPrice - value);
+        break;
+    }
+
+    this.finalPrice = Math.round(finalPrice * 100) / 100;
   }
 }

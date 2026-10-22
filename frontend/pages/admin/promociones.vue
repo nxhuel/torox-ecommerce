@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import { Plus, Pencil, Trash2, Loader2, Tag, Percent, Truck, BadgePercent, Coins } from 'lucide-vue-next'
-import type { Promotion } from '~/types'
-import { promotionsService } from '~/services'
+import type { Category, Product, Promotion } from '~/types'
+import { categoriesService, productsService, promotionsService } from '~/services'
 import { PROMOTION_TYPE_LABELS, useFormat } from '~/composables/useFormat'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
-const { currency, date } = useFormat()
+const { currency, percentage, date } = useFormat()
 const toast = useToast()
 const promotions = ref<Promotion[]>([])
+const products = ref<Product[]>([])
+const categories = ref<Category[]>([])
 const loading = ref(true)
 const showModal = ref(false)
 const editing = ref<Promotion | null>(null)
 const saving = ref(false)
+const productSearch = ref('')
 
 const form = reactive({
   name: '',
@@ -22,6 +25,18 @@ const form = reactive({
   startDate: '',
   endDate: '',
   isActive: true,
+  productIds: [] as string[],
+  categoryIds: [] as string[],
+})
+
+const filteredProducts = computed(() => {
+  const term = productSearch.value.trim().toLowerCase()
+  if (!term) return products.value
+  return products.value.filter(
+    (product) =>
+      product.name.toLowerCase().includes(term) ||
+      (product.brand || '').toLowerCase().includes(term),
+  )
 })
 
 const typeIcons: Record<string, Component> = {
@@ -36,7 +51,14 @@ onMounted(load)
 async function load() {
   loading.value = true
   try {
-    promotions.value = await promotionsService.all()
+    const [promos, productResult, cats] = await Promise.all([
+      promotionsService.all(),
+      productsService.all({ limit: 200 }),
+      categoriesService.all(),
+    ])
+    promotions.value = promos
+    products.value = productResult.items
+    categories.value = cats
   } finally {
     loading.value = false
   }
@@ -54,7 +76,10 @@ function openCreate() {
     startDate: today,
     endDate: end,
     isActive: true,
+    productIds: [],
+    categoryIds: [],
   })
+  productSearch.value = ''
   showModal.value = true
 }
 
@@ -65,16 +90,37 @@ function openEdit(promotion: Promotion) {
     description: promotion.description || '',
     type: promotion.type,
     value: Number(promotion.value),
-    startDate: promotion.startDate.slice(0, 10),
-    endDate: promotion.endDate.slice(0, 10),
+    startDate: toDateInput(promotion.startDate),
+    endDate: toDateInput(promotion.endDate),
     isActive: promotion.isActive,
+    productIds: [...(promotion.productIds || [])],
+    categoryIds: [...(promotion.categoryIds || [])],
   })
+  productSearch.value = ''
   showModal.value = true
+}
+
+/**
+ * yyyy-mm-dd in the browser's timezone. `.toISOString().slice(0, 10)` shifts
+ * the day for UTC-3 and made the edit form show the wrong end date.
+ */
+function toDateInput(value: string) {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 async function save() {
   if (!form.name || !form.startDate || !form.endDate) {
     toast.error('Completá nombre y fechas')
+    return
+  }
+  // The date input is a calendar day: include the whole end day.
+  const startDate = new Date(`${form.startDate}T00:00:00`)
+  const endDate = new Date(`${form.endDate}T23:59:59.999`)
+  if (endDate < startDate) {
+    toast.error('La fecha de fin no puede ser anterior a la de inicio')
     return
   }
   saving.value = true
@@ -83,9 +129,11 @@ async function save() {
     description: form.description || undefined,
     type: form.type,
     value: Number(form.value),
-    startDate: new Date(form.startDate).toISOString(),
-    endDate: new Date(form.endDate).toISOString(),
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
     isActive: form.isActive,
+    productIds: form.productIds,
+    categoryIds: form.productIds.length ? [] : form.categoryIds,
   }
   try {
     if (editing.value) {
@@ -116,9 +164,19 @@ async function remove(promotion: Promotion) {
 }
 
 function formatValue(promotion: Promotion) {
-  if (promotion.type === 'PERCENTAGE_DISCOUNT') return `${promotion.value}%`
-  if (promotion.type === 'FREE_SHIPPING') return `desde ${currency(promotion.value)}`
+  if (promotion.type === 'PERCENTAGE_DISCOUNT') return `${percentage(promotion.value)}%`
+  if (promotion.type === 'FREE_SHIPPING') {
+    return Number(promotion.value) > 0 ? `desde ${currency(promotion.value)}` : 'Sin mínimo'
+  }
   return currency(promotion.value)
+}
+
+function scopeLabel(promotion: Promotion) {
+  const productsCount = promotion.productIds?.length || 0
+  const categoriesCount = promotion.categoryIds?.length || 0
+  if (productsCount) return `${productsCount} producto${productsCount === 1 ? '' : 's'}`
+  if (categoriesCount) return `${categoriesCount} categoría${categoriesCount === 1 ? '' : 's'}`
+  return 'Todos los productos'
 }
 </script>
 
@@ -180,6 +238,9 @@ function formatValue(promotion: Promotion) {
         <p class="mt-2 text-xs text-slate-400">
           {{ date(promotion.startDate) }} — {{ date(promotion.endDate) }}
         </p>
+        <p class="mt-1 text-xs text-slate-400">
+          Aplica a: <span class="font-medium text-slate-500">{{ scopeLabel(promotion) }}</span>
+        </p>
       </div>
     </div>
 
@@ -207,7 +268,15 @@ function formatValue(promotion: Promotion) {
           </select>
         </div>
         <div>
-          <label class="label-base">{{ form.type === 'PERCENTAGE_DISCOUNT' ? 'Porcentaje' : 'Valor' }}</label>
+          <label class="label-base">
+            {{
+              form.type === 'PERCENTAGE_DISCOUNT'
+                ? 'Porcentaje'
+                : form.type === 'FREE_SHIPPING'
+                  ? 'Monto mínimo'
+                  : 'Valor'
+            }}
+          </label>
           <input v-model.number="form.value" type="number" min="0" class="input-base" />
         </div>
         <div class="grid grid-cols-2 gap-4">
@@ -219,6 +288,83 @@ function formatValue(promotion: Promotion) {
             <label class="label-base">Fecha fin</label>
             <input v-model="form.endDate" type="date" class="input-base" />
           </div>
+        </div>
+        <div class="rounded-xl border border-slate-200 p-3">
+          <p class="text-sm font-semibold text-slate-700">¿A qué aplica?</p>
+          <p class="mt-0.5 text-xs text-slate-400">
+            Si no seleccionás nada, la promoción se aplica a todos los productos.
+          </p>
+
+          <div class="mt-3">
+            <label class="label-base">Productos</label>
+            <input
+              v-model="productSearch"
+              class="input-base"
+              placeholder="Buscar producto por nombre o marca..."
+            />
+            <div class="mt-2 max-h-40 overflow-y-auto rounded-lg border border-slate-200 p-1.5">
+              <label
+                v-for="product in filteredProducts"
+                :key="product.id"
+                class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <input
+                  v-model="form.productIds"
+                  type="checkbox"
+                  :value="product.id"
+                  class="h-4 w-4 rounded border-slate-300 text-brand-600"
+                />
+                <span class="truncate">{{ product.name }}</span>
+                <span v-if="product.brand" class="ml-auto shrink-0 text-[11px] text-slate-400">
+                  {{ product.brand }}
+                </span>
+              </label>
+              <p v-if="!filteredProducts.length" class="px-2 py-2 text-xs text-slate-400">
+                Sin resultados
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="label-base">Categorías</label>
+            <div class="mt-2 max-h-32 overflow-y-auto rounded-lg border border-slate-200 p-1.5">
+              <label
+                v-for="category in categories"
+                :key="category.id"
+                class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <input
+                  v-model="form.categoryIds"
+                  type="checkbox"
+                  :value="category.id"
+                  class="h-4 w-4 rounded border-slate-300 text-brand-600"
+                />
+                <span class="truncate">{{ category.name }}</span>
+              </label>
+              <p v-if="!categories.length" class="px-2 py-2 text-xs text-slate-400">
+                No hay categorías
+              </p>
+            </div>
+          </div>
+
+          <p
+            v-if="form.productIds.length && form.categoryIds.length"
+            class="mt-2 text-xs text-amber-600"
+          >
+            Se priorizan los productos: las categorías seleccionadas no se van a tener en cuenta.
+          </p>
+          <p v-if="!form.productIds.length && !form.categoryIds.length" class="mt-2 text-xs text-slate-400">
+            Sin selección: aplica a todos los productos.
+          </p>
+          <p v-else-if="form.productIds.length" class="mt-2 text-xs text-brand-600">
+            Aplica solo a {{ form.productIds.length }}
+            {{ form.productIds.length === 1 ? 'producto seleccionado' : 'productos seleccionados' }}.
+          </p>
+          <p v-else class="mt-2 text-xs text-brand-600">
+            Aplica a todos los productos de
+            {{ form.categoryIds.length }}
+            {{ form.categoryIds.length === 1 ? 'categoría seleccionada' : 'categorías seleccionadas' }}.
+          </p>
         </div>
         <label class="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700">
           <input v-model="form.isActive" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-brand-600" />

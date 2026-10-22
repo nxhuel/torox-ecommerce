@@ -97,5 +97,18 @@ export const useFormat = () => {
     })
   }
 
-  return { currency, percentage, date, dateTime }
+  /** Human readable value for a promotion: 20% / $10.000 / envío gratis. */
+  const promotionValue = (
+    promotion: { type?: string; value?: number | string } | null | undefined,
+  ): string => {
+    if (!promotion) return ''
+    const value = Number(promotion.value || 0)
+    if (promotion.type === 'PERCENTAGE_DISCOUNT') return `${percentage(value)}%`
+    if (promotion.type === 'FREE_SHIPPING') {
+      return value > 0 ? `Envío gratis desde ${currency(value)}` : 'Envío gratis'
+    }
+    return currency(value)
+  }
+
+  return { currency, percentage, date, dateTime, promotionValue }
 }

@@ -43,6 +43,15 @@ export class CreateOrderDto {
   @IsEnum(ShippingMethod)
   shippingMethod: ShippingMethod;
 
+  /** Id de la opción de envío elegida en el checkout (`carrier|service|dropOff`). */
+  @IsOptional() @IsString() shippingOptionId?: string;
+
+  /** Sucursal elegida para retirar el paquete (cuando la entrega es en sucursal). */
+  @IsOptional() @IsString() shippingBranchCode?: string;
+
+  /** Carrier al que pertenece la sucursal elegida. */
+  @IsOptional() @IsString() shippingBranchCarrier?: string;
+
   @IsOptional()
   @IsObject()
   @ValidateNested()

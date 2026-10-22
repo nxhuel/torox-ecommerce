@@ -30,35 +30,54 @@ export class CartService {
     return cart;
   }
 
-  async addItem(cartId: string, productId: string, quantity: number): Promise<Cart> {
+  async addItem(cartId: string, productId: string, quantity: number, variantId?: string | null): Promise<Cart> {
     const cart = await this.cartRepo.findOne({ where: { id: cartId }, relations: { items: true } });
     if (!cart) throw new NotFoundException('Carrito no encontrado');
 
     const product = await this.productsService.findOne(productId);
     if (!product.isActive) throw new BadRequestException('Producto no disponible');
-    if (product.stock < quantity) throw new BadRequestException(`Stock insuficiente. Disponible: ${product.stock}`);
 
-    const existingItem = cart.items?.find(i => i.productId === productId);
+    const variants = product.variants || [];
+    let variant = null;
+    if (variants.length) {
+      if (!variantId) throw new BadRequestException('Elegí una variante del producto');
+      variant = variants.find((v) => v.id === variantId && v.isActive) || null;
+      if (!variant) throw new BadRequestException('La variante seleccionada no está disponible');
+    } else if (variantId) {
+      throw new BadRequestException('El producto no tiene variantes');
+    }
+
+    const available = variant ? variant.stock : product.stock;
+    if (available < quantity) {
+      throw new BadRequestException(`Stock insuficiente. Disponible: ${available}`);
+    }
+
+    const existingItem = cart.items?.find(
+      (i) => i.productId === productId && (i.variantId ?? null) === (variantId ?? null),
+    );
     // `finalPrice` is derived from the list price + discount on the entity.
     const finalPrice = Number(product.finalPrice);
 
     if (existingItem) {
       const newQty = existingItem.quantity + quantity;
-      if (product.stock < newQty) throw new BadRequestException(`Stock insuficiente. Disponible: ${product.stock}`);
+      if (available < newQty) throw new BadRequestException(`Stock insuficiente. Disponible: ${available}`);
       existingItem.quantity = newQty;
       await this.itemRepo.save(existingItem);
     } else {
       const item = this.itemRepo.create({
         cartId,
         productId,
+        variantId: variant?.id ?? null,
         quantity,
         unitPrice: finalPrice,
         productSnapshot: {
           name: product.name,
-          image: product.images?.[0],
+          image: variant?.images?.[0] || product.images?.[0],
           brand: product.brand,
           slug: product.slug,
-          stock: product.stock,
+          stock: available,
+          variantId: variant?.id ?? null,
+          variantName: variant?.name ?? null,
         },
       });
       await this.itemRepo.save(item);
@@ -76,7 +95,10 @@ export class CartService {
       await this.itemRepo.remove(item);
     } else {
       const product = await this.productsService.findOne(item.productId);
-      if (product.stock < quantity) throw new BadRequestException(`Stock insuficiente`);
+      const available = item.variantId
+        ? (product.variants || []).find((v) => v.id === item.variantId)?.stock ?? 0
+        : product.stock;
+      if (available < quantity) throw new BadRequestException(`Stock insuficiente. Disponible: ${available}`);
       item.quantity = quantity;
       await this.itemRepo.save(item);
     }

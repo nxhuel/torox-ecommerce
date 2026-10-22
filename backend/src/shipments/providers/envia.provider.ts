@@ -1,12 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import {
   ShipmentProvider,
   CreateShipmentInput,
   ShipmentCreationResult,
-  ShipmentQuoteResult,
+  EnviaAddress,
+  PackageSpec,
+  ShippingOption,
+  BranchInfo,
 } from './shipment-provider.interface';
 import { ShipmentStatus } from '../entities/shipment.entity';
 
@@ -42,7 +45,30 @@ export const PROVINCE_MAP: Record<string, string> = {
   'Tucumán': 'TM',
 };
 
-// Carriers que se cotizan por defecto en Argentina (se puede override con ENVIA_CARRIERS).
+/** Provincia a partir del código de Envia ("DF" → "Ciudad Autónoma de Buenos Aires"). */
+const PROVINCE_NAME: Record<string, string> = Object.entries(PROVINCE_MAP).reduce(
+  (acc, [name, code]) => {
+    acc[code] = name;
+    return acc;
+  },
+  {} as Record<string, string>,
+);
+
+/**
+ * Los nombres de ciudad que trae el checkout no siempre los reconoce el
+ * geocoder (por ejemplo "Ciudad Autónoma de Buenos Aires"). Se normalizan.
+ */
+const CITY_ALIASES: Record<string, string> = {
+  'ciudad autonoma de buenos aires': 'Buenos Aires',
+  'ciudad autonoma de bs as': 'Buenos Aires',
+};
+
+function normalizeCity(city?: string): string {
+  if (!city) return '';
+  return CITY_ALIASES[city.trim().toLowerCase()] ?? city;
+}
+
+/** Carriers que se cotizan por defecto en Argentina (se puede override con ENVIA_CARRIERS). */
 const DEFAULT_CARRIERS = ['correoArgentino', 'andreani', 'oca'];
 
 // ─── Mapeo estado Envia → ShipmentStatus ────────────────────────────────────
@@ -80,48 +106,109 @@ interface EnviaRateItem {
   serviceId?: number | string;
   service: string;
   serviceDescription?: string;
-  /** 0 = puerta a puerta (a domicilio), 2 = sucursal a puerta. */
+  /** 0 = puerta a puerta, 1 = puerta a sucursal, 2 = sucursal a puerta, 3 = sucursal a sucursal. */
   dropOff?: number;
+  dropOffDescription?: string;
+  branchType?: string | null;
   deliveryEstimate?: string;
-  deliveryDate?: { date?: string; dateDifference?: number; timeUnit?: string };
+  deliveryDate?: { date?: string; dateDifference?: number; timeUnit?: string; time?: string };
   totalPrice: number | string;
   currency?: string;
+  branches?: unknown[];
 }
 
-export interface EnviaQuoteParams {
-  /** Código de estado Envia para el destino (code_2_digits, ej. "DF"). */
-  provinceCode: string;
-  postalCode: string;
-  city?: string;
-  weightKg: number;
-  widthCm: number;
-  heightCm: number;
-  lengthCm: number;
-  /** Valor declarado del paquete (seguro). */
-  declaredValue?: number;
-  content?: string;
+/** Fila que devuelve el Queries API en /branches/{carrier}/{country}. */
+interface EnviaBranchRow {
+  branch_id?: string;
+  branch_code?: string;
+  branch_type?: number;
+  reference?: string;
+  distance?: number;
+  phone?: string;
+  hours?: unknown;
+  address?: {
+    street?: string;
+    number?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+    latitude?: string | number;
+    longitude?: string | number;
+    admission?: boolean;
+    delivery?: boolean;
+    address?: string;
+  };
+}
+
+function toNumber(value?: string | number | null): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const parsed = typeof value === 'number' ? value : parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 @Injectable()
 export class EnviaProvider implements ShipmentProvider {
   private readonly logger = new Logger(EnviaProvider.name);
-  private readonly apiBase = process.env.ENVIA_API_BASE || 'https://api.envia.com';
+
+  /** Caché de geocodificación (1 hora). */
+  private geoCache: {
+    key: string;
+    value: { latitude: number; longitude: number; source: string } | null;
+    expiresAt: number;
+  } | null = null;
+
+  /** Caché de la lista de carriers (5 minutos). */
+  private carriersCache: {
+    value: { id: string; name: string; description?: string }[];
+    expiresAt: number;
+  } | null = null;
+
+  /** Caché de coordenadas por código postal (1 hora). */
+  private postalCodeCache = new Map<
+    string,
+    { value: { latitude: number; longitude: number } | null; expiresAt: number }
+  >();
+
+  /** Caché de geocodificación por dirección (1 hora). */
+  private addressGeoCache = new Map<
+    string,
+    { value: { latitude: number; longitude: number } | null; expiresAt: number }
+  >();
 
   constructor(
     private readonly config: ConfigService,
     private readonly http: HttpService,
   ) {}
 
-  // ─── Auth ────────────────────────────────────────────────────────────────────
+  // ─── Configuración ──────────────────────────────────────────────────────────
+
+  get apiBase(): string {
+    return this.config.get<string>('ENVIA_API_BASE') || 'https://api.envia.com';
+  }
+
+  get queriesBase(): string {
+    return this.config.get<string>('ENVIA_QUERIES_BASE') || 'https://queries.envia.com';
+  }
+
+  get geocodeBase(): string {
+    return this.config.get<string>('ENVIA_GEOCODE_BASE') || 'https://geocodes.envia.com';
+  }
+
+  /** true si estamos pegando al sandbox (api-test.envia.com). */
+  get isSandbox(): boolean {
+    return this.apiBase.includes('test');
+  }
+
   /**
    * Envia usa un único Bearer token (la API key del dashboard), sin endpoint de login.
-   * Si no está configurado, se trabaja en modo demo para no romper el checkout.
+   * Si no está configurado, el envío no puede cotizarse ni generarse.
    */
-  private getToken(): string {
+  private getToken(): string | null {
     const token = this.config.get<string>('ENVIA_API_KEY');
     if (!token) {
-      this.logger.warn('ENVIA_API_KEY no configurada. Usando modo demo.');
-      return 'DEMO_MODE';
+      this.logger.error('ENVIA_API_KEY no configurada: no se puede operar con Envia.com.');
+      return null;
     }
     return token;
   }
@@ -134,24 +221,40 @@ export class EnviaProvider implements ShipmentProvider {
     };
   }
 
-  private get carriers(): string[] {
-    const configured = this.config.get<string>('ENVIA_CARRIERS');
-    if (!configured) return DEFAULT_CARRIERS;
-    const list = configured
+  /**
+   * Slugs de los carriers a cotizar. `undefined` significa "todos los carriers
+   * disponibles" (se configura con ENVIA_CARRIERS=all o vacío).
+   */
+  getCarrierSlugs(): string[] | undefined {
+    const raw = (this.config.get<string>('ENVIA_CARRIERS') ?? '').trim();
+    if (!raw || raw.toLowerCase() === 'all') return undefined;
+    const list = raw
       .split(',')
       .map((c) => c.trim())
       .filter(Boolean);
     return list.length ? list : DEFAULT_CARRIERS;
   }
 
-  // ─── Direcciones ─────────────────────────────────────────────────────────────
-  private get origin() {
+  /**
+   * Carriers con los que se cotiza. Si no hay una lista configurada se consultan
+   * los carriers disponibles en Argentina (Envia exige el carrier en la request).
+   */
+  private async resolveCarrierSlugs(): Promise<string[]> {
+    const configured = this.getCarrierSlugs();
+    if (configured) return configured;
+    const carriers = await this.getCarriers();
+    return carriers.map((c) => c.name);
+  }
+
+  /** Dirección de origen tal como está configurada en el .env. */
+  envOrigin(): EnviaAddress {
     return {
       name: this.config.get<string>('ENVIA_ORIGIN_NAME', 'TOROX'),
       company: this.config.get<string>('ENVIA_ORIGIN_COMPANY', 'TOROX'),
-      phone: this.config.get<string>('ENVIA_ORIGIN_PHONE', ''),
       email: this.config.get<string>('ENVIA_ORIGIN_EMAIL', ''),
+      phone: this.config.get<string>('ENVIA_ORIGIN_PHONE', ''),
       street: this.config.get<string>('ENVIA_ORIGIN_STREET', ''),
+      number: this.config.get<string>('ENVIA_ORIGIN_NUMBER', ''),
       city: this.config.get<string>('ENVIA_ORIGIN_CITY', ''),
       state: this.config.get<string>('ENVIA_ORIGIN_STATE', 'DF'),
       country: 'AR',
@@ -159,18 +262,13 @@ export class EnviaProvider implements ShipmentProvider {
     };
   }
 
-  private buildPackage(params: {
-    weightKg: number;
-    widthCm: number;
-    heightCm: number;
-    lengthCm: number;
-    declaredValue?: number;
-    content?: string;
-  }) {
+  // ─── Paquetes ───────────────────────────────────────────────────────────────
+
+  private buildPackage(params: PackageSpec) {
     return {
-      type: 'box',
+      type: params.type || 'box',
       content: params.content || 'Producto',
-      amount: 1,
+      amount: params.amount ?? 1,
       declaredValue: params.declaredValue ?? 0,
       weight: params.weightKg,
       weightUnit: 'KG',
@@ -183,158 +281,568 @@ export class EnviaProvider implements ShipmentProvider {
     };
   }
 
-  // ─── Cotización ──────────────────────────────────────────────────────────────
+  // ─── Cotización ─────────────────────────────────────────────────────────────
+
   /**
-   * Envia cotiza un carrier por request, así que consultamos ENVIA_CARRIERS
-   * y devolvemos la opción a domicilio (puerta a puerta) más barata.
+   * Cotiza todos los carriers/servicios disponibles para un destino.
+   * Devuelve una lista de opciones (una por carrier + servicio + modalidad) para
+   * que el comprador elija: cada una con su precio real y su tiempo estimado.
+   *
+   * `dropOff` describe [origen → destino]:
+   *   0 = puerta a puerta · 1 = puerta a sucursal · 2 = sucursal a puerta · 3 = sucursal a sucursal
+   *
+   * El origen es POR CARRIER: cada carrier se cotiza con su propia sucursal de
+   * origen (la que el admin configuró para esa paquetería) y sólo se ofrecen las
+   * modalidades compatibles con ese origen:
+   *   - origen en una sucursal → dropOff 2 y 3 (el admin deja el paquete ahí)
+   *   - origen en la puerta   → dropOff 1 (el admin lo deja en cualquier
+   *     sucursal del carrier; nunca 0 porque no hay retiro programado).
    */
-  async quote(params: EnviaQuoteParams): Promise<ShipmentQuoteResult> {
+  async quoteOptions(params: {
+    /** Origen por carrier: `{ carrier: direccion }`. */
+    origins: Record<string, EnviaAddress>;
+    /** Origen usado cuando el carrier no tiene una sucursal configurada. */
+    fallbackOrigin?: EnviaAddress;
+    destination: EnviaAddress;
+    packages: PackageSpec[];
+    carriers?: string[];
+  }): Promise<ShippingOption[]> {
     const token = this.getToken();
-    if (token === 'DEMO_MODE') {
-      return { cost: 12000, carrierName: 'Envia (demo)', currency: 'ARS' };
+    if (!token) {
+      throw new ServiceUnavailableException(
+        'Envia.com no está configurado (falta ENVIA_API_KEY).',
+      );
     }
 
-    const destination = {
-      name: 'Cliente',
-      phone: '',
-      street: '',
-      city: params.city || '',
-      state: params.provinceCode,
-      country: 'AR',
-      postalCode: params.postalCode,
-    };
-    const packages = [
-      this.buildPackage({
-        weightKg: params.weightKg,
-        widthCm: params.widthCm,
-        heightCm: params.heightCm,
-        lengthCm: params.lengthCm,
-        declaredValue: params.declaredValue,
-        content: params.content,
-      }),
-    ];
+    const carriers = params.carriers ?? (await this.resolveCarrierSlugs());
 
-    const all: EnviaRateItem[] = [];
-    for (const carrier of this.carriers) {
-      try {
-        const response = await firstValueFrom(
-          this.http.post<{ meta: string; data: EnviaRateItem[]; error?: unknown }>(
-            `${this.apiBase}/ship/rate/`,
-            {
-              origin: this.origin,
-              destination,
-              packages,
-              shipment: { type: 1, carrier },
-            },
-            { headers: this.headers(token) },
-          ),
-        );
-        all.push(...(response.data?.data ?? []));
-      } catch (error: any) {
-        // Un carrier caído no debe romper la cotización completa.
-        this.logger.warn(
-          `No se pudo cotizar con ${carrier}: ${error?.response?.data ? JSON.stringify(error.response.data) : error?.message}`,
+    if (!carriers.length) {
+      const origin = params.fallbackOrigin;
+      if (!origin) {
+        throw new ServiceUnavailableException(
+          'No hay ningún origen configurado para cotizar envíos.',
         );
       }
+      const items = await this.rate(token, undefined, {
+        origin,
+        destination: params.destination,
+        packages: params.packages,
+      });
+      const options = items
+        .filter((item) => this.allowedDropOff(origin).includes(item.dropOff ?? 0))
+        .map((item) => this.toOption(item));
+      if (!options.length) {
+        throw new ServiceUnavailableException(
+          'Envia.com no devolvió cotizaciones para la dirección indicada.',
+        );
+      }
+      await this.attachBranches(options, params.destination, params.packages);
+      return options.sort((a, b) => a.cost - b.cost);
     }
 
-    const home = all.filter((item) => item.dropOff === 0);
-    const pool = home.length ? home : all;
-    if (!pool.length) {
-      throw new Error('Envia no devolvió cotizaciones para la dirección indicada');
-    }
-
-    const best = pool.reduce((a, b) =>
-      Number(b.totalPrice) < Number(a.totalPrice) ? b : a,
+    const settled = await Promise.allSettled(
+      carriers.map(async (carrier) => {
+        const origin = params.origins[carrier] ?? params.fallbackOrigin;
+        if (!origin) {
+          throw new Error(`No hay origen configurado para ${carrier}`);
+        }
+        const items = await this.rate(token, carrier, {
+          origin,
+          destination: params.destination,
+          packages: params.packages,
+        });
+        const allowed = this.allowedDropOff(origin);
+        return items
+          .filter((item) => allowed.includes(item.dropOff ?? 0))
+          .map((item) => this.toOption(item));
+      }),
     );
 
+    const options: ShippingOption[] = [];
+    settled.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        options.push(...result.value);
+      } else {
+        this.logger.warn(
+          `No se pudo cotizar con ${carriers[index]}: ${result.reason?.message ?? result.reason}`,
+        );
+      }
+    });
+
+    if (!options.length) {
+      throw new ServiceUnavailableException(
+        'Envia.com no devolvió cotizaciones para la configuración de origen actual.',
+      );
+    }
+
+    await this.attachBranches(options, params.destination, params.packages);
+    await this.sortBranchesByDistance(options, params.destination);
+    return options.sort((a, b) => a.cost - b.cost);
+  }
+
+  /**
+   * Ordena las sucursales de retiro por distancia al comprador. Envia devuelve
+   * la lista sin distancia, así que la calculamos desde el código postal.
+   */
+  private async sortBranchesByDistance(
+    options: ShippingOption[],
+    destination: EnviaAddress,
+  ): Promise<void> {
+    const coords = await this.geocodeAddress(destination);
+    if (!coords) return;
+    for (const option of options) {
+      for (const branch of option.branches) {
+        const lat = branch.address?.latitude;
+        const lng = branch.address?.longitude;
+        if (branch.distanceKm == null && lat != null && lng != null) {
+          branch.distanceKm = Math.round(
+            this.distanceKm(coords.latitude, coords.longitude, lat, lng) * 10,
+          ) / 10;
+        }
+      }
+      option.branches.sort(
+        (a, b) =>
+          (a.distanceKm ?? Number.MAX_SAFE_INTEGER) -
+          (b.distanceKm ?? Number.MAX_SAFE_INTEGER),
+      );
+      // Fuera de las sucursal de la otra punta del país: si hay al menos 3
+      // cercanas se muestran sólo esas.
+      const near = option.branches.filter(
+        (b) => b.distanceKm == null || b.distanceKm <= 60,
+      );
+      if (near.length >= 3) option.branches = near;
+    }
+  }
+
+  /** Distancia en línea recta entre dos coordenadas (km). */
+  private distanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  /** Coordenadas aproximadas de un código postal (cacheadas 1 hora). */
+  async geocodePostalCode(
+    postalCode: string,
+  ): Promise<{ latitude: number; longitude: number } | null> {
+    if (!postalCode) return null;
+    const cached = this.postalCodeCache.get(postalCode);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    const value = await this.geocodeEnvia(postalCode);
+    this.postalCodeCache.set(postalCode, {
+      value,
+      expiresAt: Date.now() + 60 * 60 * 1000,
+    });
+    return value;
+  }
+  /**
+   * Modalidades que se pueden ofrecer según dónde esté el origen.
+   *
+   * El negocio de TOROX es: el admin deja el paquete en la sucursal de Envia
+   * más cercana (con la etiqueta) y el carrier lo lleva hasta la casa del
+   * comprador. Eso es `dropOff 2` (sucursal a puerta) y es la única modalidad
+   * que se ofrece.
+   *
+   *   - `dropOff 0` (puerta a puerta): no, implicaría que el carrier tiene que
+   *     pasar a retirar el paquete y eso no está dado de alta.
+   *   - `dropOff 1` (puerta a sucursal): no, el comprador siempre recibe en casa.
+   *   - `dropOff 3` (sucursal a sucursal): no, el comprador no retira en sucursal.
+   */
+  private allowedDropOff(origin: EnviaAddress): number[] {
+    return origin.branchCode ? [2] : [];
+  }
+
+  private async rate(
+    token: string,
+    carrier: string | undefined,
+    params: { origin: EnviaAddress; destination: EnviaAddress; packages: PackageSpec[] },
+  ): Promise<EnviaRateItem[]> {
+    const response = await firstValueFrom(
+      this.http.post<{ meta?: string; data?: EnviaRateItem[]; error?: unknown }>(
+        `${this.apiBase}/ship/rate/`,
+        {
+          origin: params.origin,
+          destination: params.destination,
+          packages: params.packages.map((p) => this.buildPackage(p)),
+          shipment: { type: 1, ...(carrier ? { carrier } : {}) },
+          settings: { currency: 'ARS' },
+        },
+        { headers: this.headers(token) },
+      ),
+    );
+    return response.data?.data ?? [];
+  }
+
+  private toOption(item: EnviaRateItem): ShippingOption {
+    const dropOff = item.dropOff ?? 0;
+    const branches = (item.branches as EnviaBranchRow[] | undefined) ?? [];
     return {
-      cost: Number(best.totalPrice),
-      currency: best.currency,
-      carrier: best.carrier,
-      carrierId: String(best.carrierId),
-      carrierName: best.carrierDescription ?? best.carrier,
-      service: best.service,
-      serviceDescription: best.serviceDescription,
-      deliveryEstimate: best.deliveryEstimate,
-      deliveryDate: best.deliveryDate?.date,
+      id: `${item.carrier}|${item.service}|${dropOff}`,
+      carrier: item.carrier,
+      carrierId: String(item.carrierId ?? ''),
+      carrierName: item.carrierDescription ?? item.carrier,
+      service: item.service,
+      serviceDescription: item.serviceDescription,
+      dropOff,
+      dropOffDescription: item.dropOffDescription,
+      deliveryMode: dropOff === 1 || dropOff === 3 ? 'BRANCH' : 'HOME',
+      pickupMode: dropOff === 2 || dropOff === 3 ? 'BRANCH' : 'DOOR',
+      cost: Number(item.totalPrice ?? 0),
+      currency: item.currency || 'ARS',
+      deliveryEstimate: item.deliveryEstimate,
+      deliveryDate: item.deliveryDate?.date,
+      branches: branches
+        .filter((branch) => !!branch?.branch_code)
+        .map((branch) => this.toBranch(branch, item.carrier))
+        .sort(
+          (a, b) =>
+            (a.distanceKm ?? Number.MAX_SAFE_INTEGER) -
+            (b.distanceKm ?? Number.MAX_SAFE_INTEGER),
+        ),
     };
   }
 
-  // ─── Crear envío (generar etiqueta) ─────────────────────────────────────────
-  async createShipment(input: CreateShipmentInput): Promise<ShipmentCreationResult> {
+  /**
+   * Para las opciones con entrega en sucursal buscamos las sucursales donde el
+   * comprador puede retirar el paquete cerca de su dirección. Envia ya devuelve
+   * esa lista en la cotización; si viene vacía, la consultamos en el Queries API.
+   */
+  private async attachBranches(
+    options: ShippingOption[],
+    destination: EnviaAddress,
+    packages: PackageSpec[],
+  ): Promise<void> {
+    const carriers = new Set(
+      options
+        .filter((o) => o.deliveryMode === 'BRANCH' && o.branches.length === 0)
+        .map((o) => o.carrier),
+    );
+    await Promise.all(
+      [...carriers].map(async (carrier) => {
+        try {
+          const branches = await this.getBranches({
+            carrier,
+            type: 2,
+            zipcode: destination.postalCode,
+            city: destination.city,
+            state: destination.state,
+            limit: 15,
+            packages,
+          });
+          options
+            .filter(
+              (o) =>
+                o.carrier === carrier &&
+                o.deliveryMode === 'BRANCH' &&
+                o.branches.length === 0,
+            )
+            .forEach((o) => {
+              o.branches = branches;
+            });
+        } catch (error: any) {
+          this.logger.warn(
+            `No se pudieron listar sucursales de ${carrier}: ${error?.message}`,
+          );
+        }
+      }),
+    );
+  }
+
+  // ─── Sucursales ─────────────────────────────────────────────────────────────
+
+  /**
+   * Lista sucursales de un carrier. `type`: 1 = admisión (origen), 2 = entrega
+   * (destino), 3 = ambas. Usa el Queries API de Envia.
+   */
+  async getBranches(params: {
+    carrier: string;
+    type?: 1 | 2 | 3;
+    zipcode?: string;
+    city?: string;
+    state?: string;
+    limit?: number;
+    packages?: PackageSpec[];
+    timeoutMs?: number;
+  }): Promise<BranchInfo[]> {
     const token = this.getToken();
+    if (!token) return [];
 
-    const weightKg = input.weightKg ?? 0.5;
-    const widthCm = input.widthCm ?? 15;
-    const heightCm = input.heightCm ?? 10;
-    const lengthCm = input.lengthCm ?? 15;
-
-    if (token === 'DEMO_MODE') {
-      const quote: ShipmentQuoteResult = {
-        cost: 12000,
-        carrier: 'demo',
-        carrierName: 'Envia (demo)',
-        service: 'demo',
-      };
-      return this.buildDemoResult(input.orderNumber, quote);
+    const body: Record<string, unknown> = {
+      type: params.type ?? 3,
+      limitBranches: params.limit ?? 20,
+    };
+    if (params.zipcode) body.zipcode = params.zipcode;
+    if (params.city) body.locality = params.city;
+    if (params.state) body.state = params.state;
+    if (params.packages?.length) {
+      body.packages = params.packages.map((p) => ({
+        weight: p.weightKg,
+        length: p.lengthCm,
+        height: p.heightCm,
+        width: p.widthCm,
+        amount: p.amount ?? 1,
+      }));
     }
 
-    // Elegimos la opción a domicilio más barata para generar la etiqueta.
-    const quote = await this.quote({
-      provinceCode: input.provinceCode || 'DF',
-      postalCode: input.postalCode || '',
-      city: input.city,
-      weightKg,
-      widthCm,
-      heightCm,
-      lengthCm,
-      declaredValue: input.declaredValue,
-    });
+    const response = await firstValueFrom(
+      this.http
+        .post<any>(
+          `${this.queriesBase}/branches/${params.carrier}/AR`,
+          body,
+          { headers: this.headers(token) },
+        )
+        // Hay carriers (dhl, fedex) que tardan ~8s y no devuelven nada: no
+        // deben bloquear el mapa ni la cotización.
+        .pipe(timeout(params.timeoutMs ?? 5000)),
+    );
 
-    const destination = {
-      name: input.customerName,
-      phone: input.customerPhone || '',
-      email: input.customerEmail || '',
-      street: input.address,
-      city: input.city || '',
-      state: input.provinceCode || 'DF',
-      country: 'AR',
-      postalCode: input.postalCode || '',
+    // El endpoint devuelve un array plano (no envuelto en { data }).
+    const rows: EnviaBranchRow[] = Array.isArray(response.data)
+      ? response.data
+      : (response.data?.data ?? []);
+
+    return rows
+      .filter((row) => !!row?.branch_code)
+      .map((row) => this.toBranch(row, params.carrier));
+  }
+
+  private toBranch(row: EnviaBranchRow, carrier: string): BranchInfo {
+    const admission = row.address?.admission;
+    const delivery = row.address?.delivery;
+    return {
+      branchCode: row.branch_code!,
+      branchId: row.branch_id,
+      carrier,
+      reference: row.reference,
+      type: admission && delivery ? 'BOTH' : admission ? 'ORIGIN' : 'DESTINATION',
+      address: {
+        street: row.address?.street,
+        number: row.address?.number,
+        city: row.address?.city,
+        state: row.address?.state,
+        postalCode: row.address?.postalCode,
+        country: row.address?.country,
+        latitude: toNumber(row.address?.latitude),
+        longitude: toNumber(row.address?.longitude),
+      },
+      distanceKm: toNumber(row.distance),
+      phone: row.phone,
+      hours: row.hours,
     };
+  }
+
+  /** Carriers disponibles en Argentina (para los filtros del admin). */
+  async getCarriers(): Promise<{ id: string; name: string; description?: string }[]> {
+    const token = this.getToken();
+    if (!token) return [];
+    if (this.carriersCache && this.carriersCache.expiresAt > Date.now()) {
+      return this.carriersCache.value;
+    }
+    try {
+      const response = await firstValueFrom(
+        this.http.get<{ data?: { id: number | string; name: string; description?: string }[] }>(
+          `${this.queriesBase}/carrier?country_code=AR`,
+          { headers: this.headers(token) },
+        ),
+      );
+      const carriers = (response.data?.data ?? []).map((c) => ({
+        id: String(c.id),
+        name: c.name,
+        description: c.description,
+      }));
+      this.carriersCache = { value: carriers, expiresAt: Date.now() + 5 * 60 * 1000 };
+      return carriers;
+    } catch (error: any) {
+      this.logger.warn(`No se pudo obtener la lista de carriers: ${error?.message}`);
+      return [];
+    }
+  }
+
+  // ─── Geocodificación (para el mapa del admin) ───────────────────────────────
+
+  /**
+   * Convierte una dirección en coordenadas. Primero usa Nominatim (OpenStreetMap,
+   * gratis) y si falla el Geocodes API de Envia (por código postal).
+   */
+  async geocode(address: EnviaAddress): Promise<{ latitude: number; longitude: number; source: string } | null> {
+    const configuredLat = toNumber(this.config.get<string>('ENVIA_ORIGIN_LAT'));
+    const configuredLng = toNumber(this.config.get<string>('ENVIA_ORIGIN_LNG'));
+    if (configuredLat !== undefined && configuredLng !== undefined) {
+      return { latitude: configuredLat, longitude: configuredLng, source: 'env' };
+    }
+
+    const query = [address.street, address.number, address.city, address.state, address.country]
+      .filter(Boolean)
+      .join(', ');
+
+    // La geocodificación no cambia: se cachea 1 hora para no pegarle a Nominatim.
+    if (this.geoCache && this.geoCache.expiresAt > Date.now() && this.geoCache.key === query) {
+      return this.geoCache.value;
+    }
+
+    let result: { latitude: number; longitude: number; source: string } | null = null;
+    const nominatim = await this.geocodeNominatim(query);
+    if (nominatim) {
+      result = { ...nominatim, source: 'nominatim' };
+    } else {
+      const envia = await this.geocodeEnvia(address.postalCode);
+      if (envia) result = { ...envia, source: 'envia' };
+    }
+
+    this.geoCache = { key: query, value: result, expiresAt: Date.now() + 60 * 60 * 1000 };
+    return result;
+  }
+
+  private async geocodeNominatim(
+    query: string,
+  ): Promise<{ latitude: number; longitude: number } | null> {
+    if (!query.trim()) return null;
+    try {
+      const response = await firstValueFrom(
+        this.http.get<any[]>('https://nominatim.openstreetmap.org/search', {
+          params: { q: query, format: 'jsonv2', limit: 1, countrycodes: 'ar' },
+          headers: {
+            'User-Agent': `TOROX-ecommerce/1.0 (${
+              this.config.get<string>('ENVIA_ORIGIN_EMAIL') || 'admin@torox.com'
+            })`,
+          },
+        }),
+      );
+      const hit = Array.isArray(response.data) ? response.data[0] : null;
+      if (!hit?.lat || !hit?.lon) return null;
+      return { latitude: parseFloat(hit.lat), longitude: parseFloat(hit.lon) };
+    } catch (error: any) {
+      this.logger.warn(`Nominatim no pudo geocodificar "${query}": ${error?.message}`);
+      return null;
+    }
+  }
+
+  private async geocodeEnvia(
+    postalCode: string,
+  ): Promise<{ latitude: number; longitude: number } | null> {
+    if (!postalCode) return null;
+    try {
+      const response = await firstValueFrom(
+        this.http.get<any>(`${this.geocodeBase}/zipcode/AR/${encodeURIComponent(postalCode)}`),
+      );
+      // El endpoint devuelve un array (o { data: [...] }).
+      const row = Array.isArray(response.data) ? response.data[0] : response.data?.data;
+      const coords = row?.coordinates;
+      const latitude = toNumber(coords?.latitude);
+      const longitude = toNumber(coords?.longitude);
+      if (latitude === undefined || longitude === undefined) return null;
+      return { latitude, longitude };
+    } catch (error: any) {
+      this.logger.warn(`Envia Geocodes no pudo resolver el CP ${postalCode}: ${error?.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Geocodifica cualquier dirección (por ejemplo la del comprador, para medir
+   * qué tan lejos está cada sucursal de retiro). Cache 1 hora.
+   */
+  async geocodeAddress(
+    address: EnviaAddress,
+  ): Promise<{ latitude: number; longitude: number } | null> {
+    const city = normalizeCity(address.city);
+    const street = [address.street, address.number].filter(Boolean).join(' ');
+    const queries = [
+      [street, city, address.postalCode, 'Argentina'].filter(Boolean).join(', '),
+      [address.postalCode, 'Argentina'].filter(Boolean).join(', '),
+    ].filter((q) => q.trim().length > 3);
+
+    for (const query of queries) {
+      const cached = this.addressGeoCache.get(query);
+      if (cached && cached.expiresAt > Date.now()) {
+        if (cached.value) return cached.value;
+        continue;
+      }
+      const value = await this.geocodeNominatim(query);
+      this.addressGeoCache.set(query, {
+        value,
+        expiresAt: Date.now() + 60 * 60 * 1000,
+      });
+      if (value) return value;
+    }
+
+    // Último recurso: el geocoder de Envia por código postal.
+    return this.geocodeEnvia(address.postalCode);
+  }
+
+  // ─── Crear envío (generar etiqueta) ─────────────────────────────────────────
+
+  /**
+   * Genera la etiqueta usando EXACTAMENTE el carrier y el servicio que el
+   * comprador eligió y pagó. Si se pasan las sucursales (origen y/o destino)
+   * se incluyen como `branchCode` en la dirección correspondiente.
+   */
+  async createShipment(input: CreateShipmentInput): Promise<ShipmentCreationResult> {
+    const token = this.getToken();
+    if (!token) {
+      throw new ServiceUnavailableException(
+        'Envia.com no está configurado (falta ENVIA_API_KEY).',
+      );
+    }
+
+    const packageSpec: PackageSpec = {
+      weightKg: input.package.weightKg,
+      widthCm: input.package.widthCm,
+      heightCm: input.package.heightCm,
+      lengthCm: input.package.lengthCm,
+      declaredValue: input.declaredValue ?? input.package.declaredValue ?? 0,
+      content: input.package.content,
+    };
+
+    // La sucursal sólo se manda en la dirección que corresponde a la modalidad:
+    //   0 puerta a puerta · 1 puerta a sucursal · 2 sucursal a puerta · 3 sucursal a sucursal
+    const dropOff = input.dropOff ?? 0;
+    const origin: EnviaAddress = { ...input.origin };
+    const destination: EnviaAddress = { ...input.destination };
+    if (dropOff === 0 || dropOff === 1) delete origin.branchCode;
+    if (dropOff === 0 || dropOff === 2) delete destination.branchCode;
+    if ((dropOff === 2 || dropOff === 3) && !origin.branchCode) {
+      throw new Error(
+        'Para enviar desde una sucursal hay que definir la sucursal de origen.',
+      );
+    }
+    if ((dropOff === 1 || dropOff === 3) && !destination.branchCode) {
+      throw new Error(
+        'Para retirar en sucursal hay que elegir la sucursal de destino.',
+      );
+    }
 
     const response = await firstValueFrom(
       this.http.post<{
-        meta: string;
-        data: {
-          carrier: string;
-          service: string;
-          shipmentId: number | string;
-          trackingNumber: string;
+        meta?: string;
+        data?: {
+          carrier?: string;
+          service?: string;
+          shipmentId?: number | string;
+          trackingNumber?: string;
           trackUrl?: string;
           label?: string;
           totalPrice?: number | string;
           currency?: string;
         }[];
+        error?: unknown;
       }>(
         `${this.apiBase}/ship/generate/`,
         {
-          origin: this.origin,
+          origin,
           destination,
-          packages: [
-            this.buildPackage({
-              weightKg,
-              widthCm,
-              heightCm,
-              lengthCm,
-              declaredValue: input.declaredValue,
-            }),
-          ],
+          packages: [this.buildPackage(packageSpec)],
           shipment: {
             type: 1,
-            carrier: quote.carrier,
-            service: quote.service,
+            carrier: input.carrier,
+            ...(input.service ? { service: input.service } : {}),
           },
+          settings: { currency: 'ARS' },
         },
         { headers: this.headers(token) },
       ),
@@ -342,19 +850,17 @@ export class EnviaProvider implements ShipmentProvider {
 
     const data = response.data?.data?.[0];
     if (!data?.trackingNumber) {
-      throw new Error(`Envia no devolvió tracking: ${JSON.stringify(response.data)}`);
+      throw new Error(
+        `Envia no devolvió tracking: ${JSON.stringify(response.data?.error ?? response.data)}`,
+      );
     }
-
-    const estimatedDelivery = quote.deliveryDate
-      ? new Date(quote.deliveryDate)
-      : this.daysFromNow(5);
 
     return {
       trackingNumber: data.trackingNumber,
       status: ShipmentStatus.PREPARING,
-      estimatedDelivery,
-      carrierName: quote.carrierName,
-      enviaId: String(data.shipmentId),
+      estimatedDelivery: this.daysFromNow(5),
+      carrierName: data.carrier,
+      enviaId: String(data.shipmentId ?? ''),
       labelUrl: data.label,
       trackingUrl: data.trackUrl,
       events: [
@@ -367,17 +873,18 @@ export class EnviaProvider implements ShipmentProvider {
     };
   }
 
-  // ─── Estado del envío ────────────────────────────────────────────────────────
+  // ─── Estado del envío ───────────────────────────────────────────────────────
+
   async getShipmentStatus(
     trackingNumber: string,
   ): Promise<{ status: ShipmentStatus; description?: string } | null> {
     try {
       const token = this.getToken();
-      if (token === 'DEMO_MODE') return null;
+      if (!token) return null;
 
       const response = await firstValueFrom(
         this.http.post<{
-          data: {
+          data?: {
             trackingNumber: string;
             status: string;
             carrier?: string;
@@ -405,6 +912,7 @@ export class EnviaProvider implements ShipmentProvider {
   }
 
   // ─── ShipmentProvider interface ──────────────────────────────────────────────
+
   getNextStatus(current: ShipmentStatus): ShipmentStatus | null {
     const index = STATUS_FLOW.indexOf(current);
     if (index === -1 || index >= STATUS_FLOW.length - 1) return null;
@@ -412,6 +920,7 @@ export class EnviaProvider implements ShipmentProvider {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
+
   mapStatus(enviaStatus?: string): ShipmentStatus {
     if (!enviaStatus) return ShipmentStatus.PREPARING;
     const normalized = enviaStatus.toLowerCase().trim();
@@ -429,25 +938,5 @@ export class EnviaProvider implements ShipmentProvider {
     const date = new Date();
     date.setDate(date.getDate() + days);
     return date;
-  }
-
-  private buildDemoResult(
-    orderNumber: string,
-    quote: ShipmentQuoteResult,
-  ): ShipmentCreationResult {
-    return {
-      trackingNumber: `ENVIA-DEMO-${orderNumber}`,
-      status: ShipmentStatus.PREPARING,
-      estimatedDelivery: this.daysFromNow(5),
-      carrierName: quote.carrierName || 'Envia (demo)',
-      enviaId: `demo-${Date.now()}`,
-      events: [
-        {
-          status: ShipmentStatus.PREPARING,
-          date: new Date(),
-          description: 'Envío registrado en Envia.com (modo demo).',
-        },
-      ],
-    };
   }
 }

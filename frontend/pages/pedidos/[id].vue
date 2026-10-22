@@ -253,6 +253,7 @@ const shipmentProgress = computed(() => {
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="line-clamp-2 text-sm font-semibold text-slate-800">{{ item.name }}</p>
+                    <p v-if="item.variantName" class="text-xs text-slate-500">{{ item.variantName }}</p>
                     <p class="mt-0.5 text-xs text-slate-400">{{ item.sku }}</p>
                     <div class="mt-1 flex justify-between text-sm">
                       <span class="text-slate-500">{{ item.quantity }} × {{ currency(item.unitPrice) }}</span>
@@ -289,6 +290,23 @@ const shipmentProgress = computed(() => {
               <p class="text-sm text-slate-600">
                 {{ order.shippingAddress.city }}, {{ order.shippingAddress.province }} (CP {{ order.shippingAddress.postalCode }})
               </p>
+
+              <!-- Modalidad de envío -->
+              <div v-if="order.shippingOption" class="mt-4 border-t border-slate-100 pt-4 text-sm">
+                <p class="font-semibold text-slate-800">
+                  {{ order.shippingOption.deliveryMode === 'BRANCH' ? 'Retiro en sucursal' : 'Entrega a domicilio' }}
+                </p>
+                <p class="text-slate-600">
+                  {{ order.shippingOption.carrierName }} —
+                  {{ order.shippingOption.serviceDescription || order.shippingOption.service }}
+                </p>
+                <p v-if="order.shippingOption.deliveryEstimate" class="text-xs text-slate-400">
+                  Entrega estimada: {{ order.shippingOption.deliveryEstimate }}
+                </p>
+                <p class="mt-2 text-xs text-slate-500">
+                  Tu pedido llega a la dirección de arriba. No tenés que retirarlo en ningún lado.
+                </p>
+              </div>
             </div>
           </div>
         </div>

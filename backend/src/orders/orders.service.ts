@@ -1,4 +1,5 @@
 import { Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -6,7 +7,15 @@ import { Injectable,
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Order, OrderItem, OrderStatus, ShippingMethod } from './entities/order.entity';
+import {
+  Order,
+  OrderItem,
+  OrderStatus,
+  ShippingMethod,
+  ShippingOptionSnapshot,
+  ShippingBranchSnapshot,
+  ShippingOriginSnapshot,
+} from './entities/order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { CartService } from '../cart/cart.service';
@@ -23,6 +32,8 @@ import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
     @InjectRepository(OrderItem) private readonly itemRepo: Repository<OrderItem>,
@@ -43,17 +54,33 @@ export class OrdersService {
       throw new BadRequestException('El carrito está vacío');
     }
 
-    // Validate products and stock.
-    const productMap = new Map<string, any>();
+    // Validate products, variants and stock.
+    const lineMap = new Map<string, { product: any; variant: any | null }>();
     for (const item of cart.items) {
       const product = await this.productsService.findOne(item.productId);
       if (!product.isActive) {
         throw new BadRequestException(`"${product.name}" no está disponible`);
       }
-      if (product.stock < item.quantity) {
-        throw new BadRequestException(`Stock insuficiente para "${product.name}". Disponible: ${product.stock}`);
+
+      const variants = product.variants || [];
+      const variant = item.variantId
+        ? variants.find((v: any) => v.id === item.variantId)
+        : null;
+
+      if (variants.length && !variant) {
+        throw new BadRequestException(`Elegí una variante de "${product.name}"`);
       }
-      productMap.set(item.productId, product);
+      if (variant && !variant.isActive) {
+        throw new BadRequestException(`La variante "${variant.name}" de "${product.name}" no está disponible`);
+      }
+
+      const available = variant ? variant.stock : product.stock;
+      if (available < item.quantity) {
+        throw new BadRequestException(
+          `Stock insuficiente para "${product.name}${variant ? ` - ${variant.name}` : ''}". Disponible: ${available}`,
+        );
+      }
+      lineMap.set(item.id, { product, variant });
     }
 
     const subtotal = cart.items.reduce(
@@ -62,26 +89,103 @@ export class OrdersService {
     );
     const lineProductIds = cart.items.map((i) => i.productId);
     const lineCategoryIds = [
-      ...new Set(cart.items.map((i) => productMap.get(i.productId)?.categoryId).filter(Boolean)),
+      ...new Set(cart.items.map((i) => lineMap.get(i.id)?.product?.categoryId).filter(Boolean)),
     ];
 
-    const { discount, freeShipping } = await this.promotionsService.applyPromotions(
+    // Product prices already include active promotions (see ProductsService).
+    // El envío NO es gratis: el comprador paga el costo real de Envia.com,
+    // por eso la promoción de "envío gratis" no altera el total.
+    await this.promotionsService.applyPromotions(
       subtotal,
       lineCategoryIds,
       lineProductIds,
     );
+    const discount = 0;
 
-    const shippingCost =
-      dto.shippingMethod === ShippingMethod.PICKUP || freeShipping
-        ? 0
-        : await this.shipmentsService.quoteForOrderData({
-            province: dto.shippingAddress.province,
-            postalCode: dto.shippingAddress.postalCode,
-            items: cart.items.map((i) => ({
-              productId: i.productId,
-              quantity: i.quantity,
-            })),
-          });
+    // ─── Envío ────────────────────────────────────────────────────────────────
+    // Retiro en el local de TOROX: no hay envío ni guía que generar.
+    // Cualquier otro caso: el comprador elige entre las opciones de Envia.com
+    // y el precio es siempre el real que devuelve la API.
+    let shippingCost = 0;
+    let shippingMethod = dto.shippingMethod;
+    let shippingOption: ShippingOptionSnapshot | null = null;
+    let shippingBranch: ShippingBranchSnapshot | null = null;
+    let shippingOrigin: ShippingOriginSnapshot | null = null;
+
+    if (dto.shippingMethod === ShippingMethod.PICKUP) {
+      shippingMethod = ShippingMethod.PICKUP;
+    } else {
+      const resolved = await this.shipmentsService.resolveShippingOption({
+        province: dto.shippingAddress.province,
+        city: dto.shippingAddress.city,
+        postalCode: dto.shippingAddress.postalCode,
+        address: dto.shippingAddress.address,
+        number: dto.shippingAddress.number,
+        items: cart.items.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+        })),
+        optionId: dto.shippingOptionId,
+        branchCode: dto.shippingBranchCode,
+        branchCarrier: dto.shippingBranchCarrier,
+      });
+
+      const { option, branch, origin, originBranch } = resolved;
+      shippingCost = option.cost;
+      shippingMethod =
+        option.deliveryMode === 'BRANCH'
+          ? ShippingMethod.BRANCH_PICKUP
+          : ShippingMethod.HOME_DELIVERY;
+      shippingOption = {
+        id: option.id,
+        carrier: option.carrier,
+        carrierName: option.carrierName,
+        service: option.service,
+        serviceDescription: option.serviceDescription,
+        dropOff: option.dropOff,
+        dropOffDescription: option.dropOffDescription,
+        deliveryMode: option.deliveryMode,
+        pickupMode: option.pickupMode,
+        cost: option.cost,
+        currency: option.currency,
+        deliveryEstimate: option.deliveryEstimate,
+        deliveryDate: option.deliveryDate,
+      };
+      // El origen queda congelado: la etiqueta sale desde la misma sucursal
+      // con la que se cotizó, aunque el admin después cambie el origen.
+      shippingOrigin = {
+        carrier: option.carrier,
+        branchCode: origin.branchCode ?? null,
+        reference: originBranch?.reference ?? null,
+        address: {
+          name: origin.name,
+          company: origin.company,
+          email: origin.email,
+          phone: origin.phone,
+          street: origin.street,
+          number: origin.number,
+          city: origin.city,
+          state: origin.state,
+          country: origin.country,
+          postalCode: origin.postalCode,
+        },
+      };
+      shippingBranch = branch
+        ? {
+            branchCode: branch.branchCode,
+            branchId: branch.branchId,
+            carrier: branch.carrier,
+            carrierName: branch.carrierName,
+            reference: branch.reference,
+            type: branch.type,
+            address: branch.address,
+            distanceKm: branch.distanceKm,
+            phone: branch.phone,
+            hours: branch.hours,
+          }
+        : null;
+    }
+
     const total = subtotal - discount + shippingCost;
 
     const order = this.orderRepo.create({
@@ -91,7 +195,10 @@ export class OrdersService {
       customerEmail: dto.customerEmail,
       customerPhone: dto.customerPhone,
       shippingAddress: dto.shippingAddress,
-      shippingMethod: dto.shippingMethod,
+      shippingMethod,
+      shippingOption,
+      shippingBranch,
+      shippingOrigin,
       subtotal,
       discount,
       shippingCost,
@@ -99,12 +206,14 @@ export class OrdersService {
       status: OrderStatus.PENDING_PAYMENT,
       notes: dto.notes,
       items: cart.items.map((item) => {
-        const product = productMap.get(item.productId);
+        const { product, variant } = lineMap.get(item.id)!;
         return this.itemRepo.create({
           productId: item.productId,
+          variantId: variant?.id ?? null,
+          variantName: variant?.name ?? null,
           name: product.name,
-          sku: product.sku,
-          image: product.images?.[0],
+          sku: variant?.sku || product.sku,
+          image: variant?.images?.[0] || product.images?.[0],
           unitPrice: Number(item.unitPrice),
           quantity: item.quantity,
           subtotal: Number(item.unitPrice) * item.quantity,
@@ -116,7 +225,7 @@ export class OrdersService {
 
     // Decrease stock and clear the cart.
     for (const item of cart.items) {
-      await this.productsService.decreaseStock(item.productId, item.quantity);
+      await this.productsService.decreaseStock(item.productId, item.quantity, item.variantId ?? undefined);
     }
     await this.cartService.clearCart(cart.id);
 
@@ -248,7 +357,7 @@ export class OrdersService {
       amount: Number(order.total),
       items: order.items.map(i => ({
         id: i.productId,
-        name: i.name,
+        name: i.variantName ? `${i.name} - ${i.variantName}` : i.name,
         image: i.image,
         quantity: i.quantity,
         unitPrice: Number(i.unitPrice),
@@ -290,7 +399,7 @@ export class OrdersService {
       amount: Number(order.total),
       items: order.items.map(i => ({
         id: i.productId,
-        name: i.name,
+        name: i.variantName ? `${i.name} - ${i.variantName}` : i.name,
         image: i.image,
         quantity: i.quantity,
         unitPrice: Number(i.unitPrice),
@@ -343,14 +452,16 @@ export class OrdersService {
 
     if (target === OrderStatus.SHIPPED) {
       const shipment = await this.shipmentsService.createForOrder(order);
-      await this.notificationsService.createForOrderCustomer(
-        order,
-        NotificationType.SHIPMENT_STATUS,
-        'Tu pedido fue enviado',
-        `Tu pedido ${order.orderNumber} fue despachado. Código de seguimiento: ${shipment.trackingNumber}`,
-        `/pedidos/${order.id}`,
-      );
-      await this.mailService.sendShipmentStatus(order.customerEmail, order.orderNumber, shipment.trackingNumber);
+      if (shipment) {
+        await this.notificationsService.createForOrderCustomer(
+          order,
+          NotificationType.SHIPMENT_STATUS,
+          'Tu pedido fue enviado',
+          `Tu pedido ${order.orderNumber} fue despachado. Código de seguimiento: ${shipment.trackingNumber}`,
+          `/pedidos/${order.id}`,
+        );
+        await this.mailService.sendShipmentStatus(order.customerEmail, order.orderNumber, shipment.trackingNumber);
+      }
     }
 
     if (target === OrderStatus.DELIVERED) {
@@ -383,7 +494,15 @@ export class OrdersService {
     order.status = OrderStatus.PAYMENT_APPROVED;
     await this.orderRepo.save(order);
 
-    await this.shipmentsService.createForOrder(order);
+    // Generamos la guía en Envia.com. Si la API falla, el pedido queda pagos y
+    // el admin puede reintentar la generación desde el detalle del pedido.
+    try {
+      await this.shipmentsService.createForOrder(order);
+    } catch (error: any) {
+      this.logger.error(
+        `No se pudo generar la guía de Envia para el pedido ${order.orderNumber}: ${error?.message}`,
+      );
+    }
 
     await this.financeService.recordIncome(
       `Venta ${order.orderNumber} — ${order.customerName}`,
@@ -433,7 +552,7 @@ export class OrdersService {
 
     // Restore stock.
     for (const item of order.items || []) {
-      await this.productsService.restoreStock(item.productId, item.quantity);
+      await this.productsService.restoreStock(item.productId, item.quantity, item.variantId ?? undefined);
     }
 
     // Register a refund if the payment had already been approved.

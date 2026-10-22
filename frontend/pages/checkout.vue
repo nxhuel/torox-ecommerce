@@ -9,7 +9,6 @@ import {
   Loader2,
   Building,
   Home,
-  Landmark,
   ExternalLink,
   Package,
 } from 'lucide-vue-next'
@@ -18,6 +17,7 @@ import { useAuthStore } from '~/stores/auth'
 import { ordersService, shipmentsService } from '~/services'
 import { useFormat } from '~/composables/useFormat'
 import { useApi } from '~/composables/useApi'
+import type { ShippingOption } from '~/types'
 
 const router = useRouter()
 const cart = useCartStore()
@@ -32,8 +32,9 @@ const error = ref('')
 const redirectingToMp = ref(false)
 
 // ── Cotización de envío ───────────────────────────────────────────────
-/** Costo de envío cotizado en tiempo real por Envia.com */
-const quotedShippingCost = ref<number | null>(null)
+/** Opciones de envío reales cotizadas por Envia.com (carrier + servicio + precio). */
+const shippingOptions = ref<ShippingOption[]>([])
+const selectedOptionId = ref<string | null>(null)
 const quotingShipping = ref(false)
 const quoteError = ref('')
 
@@ -48,7 +49,8 @@ const form = reactive({
   number: '',
   apartment: '',
   references: '',
-  shippingMethod: 'HOME_DELIVERY' as 'HOME_DELIVERY' | 'PICKUP',
+  /** Única modalidad: entrega a domicilio. */
+  shippingMethod: 'HOME_DELIVERY' as 'HOME_DELIVERY',
   cardNumber: '',
   cardHolder: '',
   cardExpiry: '',
@@ -103,22 +105,35 @@ const steps = [
   { number: 4, label: 'Pago', icon: CreditCard },
 ]
 
-const shippingCost = computed(() => {
-  if (!cart.cart) return 0
-  if (form.shippingMethod === 'PICKUP') return 0
-  // Si ya cotizamos con Envia.com, usar ese valor; si no, usar el del carrito
-  return quotedShippingCost.value ?? cart.cart.shippingCost
-})
-
-// El envío recién se conoce cuando cotiza Envia con la dirección ingresada.
-const shippingPending = computed(
-  () => form.shippingMethod !== 'PICKUP' && quotedShippingCost.value === null,
+// ── Opciones de envío ─────────────────────────────────────────────────
+/**
+ * Opciones de envío con entrega a domicilio. El paquete sale desde la sucursal
+ * de Envia más cercana al local y el carrier lo lleva hasta la casa del
+ * comprador: nunca hay retiro en sucursal ni retiro en TOROX.
+ */
+const homeOptions = computed(() => shippingOptions.value.filter((o) => o.deliveryMode === 'HOME'))
+/** Opción elegida por el comprador. */
+const selectedOption = computed(
+  () => shippingOptions.value.find((o) => o.id === selectedOptionId.value) ?? null,
 )
 
+const shippingCost = computed(() => selectedOption.value?.cost ?? 0)
+
+// El envío recién se conoce cuando cotiza Envia con la dirección ingresada.
+const shippingPending = computed(() => selectedOption.value === null)
+
 const shippingLabel = computed(() => {
-  if (form.shippingMethod === 'PICKUP') return 'Gratis'
   if (shippingPending.value) return 'A cotizar'
-  return quotedShippingCost.value === 0 ? 'Gratis' : currency(quotedShippingCost.value)
+  return shippingCost.value === 0 ? 'Gratis' : currency(shippingCost.value)
+})
+
+/** Descripción corta de la opción elegida, para el resumen lateral. */
+const shippingSummary = computed(() => {
+  if (!selectedOption.value) return ''
+  const eta = selectedOption.value.deliveryEstimate
+    ? ` · ${selectedOption.value.deliveryEstimate}`
+    : ''
+  return `${selectedOption.value.carrierName} — Entrega a domicilio${eta}`
 })
 
 // Mismo cálculo que hace el backend al crear la orden:
@@ -131,28 +146,39 @@ const displayTotal = computed(() => {
 
 // Cotiza el envío cuando el usuario completa CP y provincia en el paso 2
 async function fetchShippingQuote() {
-  if (form.shippingMethod === 'PICKUP') {
-    quotedShippingCost.value = 0
-    return
-  }
-  if (!form.postalCode || !form.province) return
+  shippingOptions.value = []
+  selectedOptionId.value = null
+  if (!form.postalCode || !form.province || !cart.cart?.items?.length) return
 
   quotingShipping.value = true
   quoteError.value = ''
-  quotedShippingCost.value = null
   try {
     const result = await shipmentsService.quote({
       province: form.province,
       city: form.city.trim() || undefined,
       postalCode: form.postalCode,
+      address: form.address.trim() || undefined,
+      number: form.number.trim() || undefined,
+      items: cart.cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
     })
-    quotedShippingCost.value = result.cost ?? 0
-  } catch {
-    quoteError.value = 'No se pudo cotizar el envío. Se calculará al confirmar el pedido.'
-    quotedShippingCost.value = null
+    shippingOptions.value = result.options ?? []
+    // Por defecto queda preseleccionada la opción más barata.
+    selectOption(shippingOptions.value[0]?.id ?? null)
+  } catch (err: any) {
+    quoteError.value = err?.message || 'No se pudo cotizar el envío con Envia.com.'
+    shippingOptions.value = []
+    selectedOptionId.value = null
   } finally {
     quotingShipping.value = false
   }
+}
+
+/** Selecciona una opción de envío (siempre con entrega a domicilio). */
+function selectOption(optionId: string | null) {
+  selectedOptionId.value = optionId
+  const option = shippingOptions.value.find((o) => o.id === optionId)
+  if (!option) return
+  form.shippingMethod = 'HOME_DELIVERY'
 }
 
 function validateStep(current: number): boolean {
@@ -168,13 +194,17 @@ function validateStep(current: number): boolean {
     }
   }
   if (current === 2) {
-    if (form.shippingMethod === 'HOME_DELIVERY') {
-      if (!form.city || !form.postalCode || !form.address || !form.number) {
-        error.value = 'Completá todos los campos de la dirección de envío.'
-        return false
-      }
-      // Cotizar envío al pasar al paso 3
-      fetchShippingQuote()
+    if (!form.city || !form.postalCode || !form.address || !form.number) {
+      error.value = 'Completá todos los campos de la dirección de envío.'
+      return false
+    }
+    // Cotizar envío al pasar al paso 3
+    fetchShippingQuote()
+  }
+  if (current === 3) {
+    if (!selectedOption.value) {
+      error.value = 'Elegí una opción de envío.'
+      return false
     }
   }
   if (current === 4) {
@@ -218,6 +248,7 @@ async function placeOrderWithMercadoPago() {
         references: form.references.trim() || undefined,
       },
       shippingMethod: form.shippingMethod,
+      shippingOptionId: selectedOption.value?.id,
       cartSessionId: auth.isAuthenticated ? undefined : cart.session(),
     })
 
@@ -372,28 +403,56 @@ async function placeOrderWithMercadoPago() {
               class="underline">Envia.com</a>
           </div>
           <h2 class="mb-5 text-lg font-bold text-slate-900">Método de envío</h2>
-          <div class="space-y-3">
-            <label class="flex cursor-pointer items-start gap-4 rounded-xl border-2 p-4 transition"
-              :class="form.shippingMethod === 'HOME_DELIVERY' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'">
-              <input v-model="form.shippingMethod" type="radio" value="HOME_DELIVERY"
-                class="mt-1 h-4 w-4 text-brand-600" />
-              <span class="flex-1">
-                <span class="flex items-center gap-2 font-semibold text-slate-800">
-                  <Home class="h-4 w-4 text-brand-600" /> Envío a domicilio por Envia.com
-                </span>
-                <!-- Cotización en tiempo real -->
-                <span class="mt-1 block text-sm">
-                  <span v-if="quotingShipping" class="flex items-center gap-1.5 text-slate-500">
-                    <Loader2 class="h-3.5 w-3.5 animate-spin" /> Calculando costo de envío...
-                  </span>
-                  <span v-else-if="quotedShippingCost !== null" class="font-semibold text-slate-800">
-                    {{ currency(quotedShippingCost) }}
-                  </span>
-                  <span v-else-if="quoteError" class="text-xs text-amber-600">{{ quoteError }}</span>
-                  <span v-else class="text-slate-400 text-xs">El costo se calculará con la dirección ingresada</span>
-                </span>
+
+          <!-- Única modalidad: entrega a domicilio -->
+          <div class="mb-3 flex items-start gap-4 rounded-xl border-2 border-brand-500 bg-brand-50/50 p-4">
+            <Home class="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
+            <span class="flex-1">
+              <span class="flex items-center gap-2 font-semibold text-slate-800">
+                Entrega a domicilio con Envia.com
               </span>
-            </label>
+            </span>
+          </div>
+
+          <div class="mt-4 space-y-4">
+            <div v-if="quotingShipping" class="flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 class="h-4 w-4 animate-spin" /> Calculando las opciones de envío...
+            </div>
+
+            <div v-else-if="quoteError" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              {{ quoteError }}
+            </div>
+
+            <div v-else-if="!shippingOptions.length" class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              Completá tu dirección para ver las opciones de envío disponibles.
+            </div>
+
+            <template v-else>
+              <!-- Entrega a domicilio -->
+              <div v-if="homeOptions.length">
+                <p class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <Home class="h-3.5 w-3.5" /> Entrega a domicilio
+                </p>
+                <div class="space-y-2">
+                  <label v-for="option in homeOptions" :key="option.id"
+                    class="flex cursor-pointer items-start gap-3 rounded-xl border-2 p-3 transition"
+                    :class="selectedOptionId === option.id ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'">
+                    <input :checked="selectedOptionId === option.id" type="radio" name="shipping-option"
+                      class="mt-1 h-4 w-4 text-brand-600" @change="selectOption(option.id)" />
+                    <span class="min-w-0 flex-1">
+                      <span class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="font-semibold text-slate-800">{{ option.carrierName }}</span>
+                        <span class="font-bold text-slate-900">{{ currency(option.cost) }}</span>
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <p v-else class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Por el momento no hay entregas a domicilio disponibles para esta dirección.
+              </p>
+            </template>
           </div>
         </div>
 
@@ -477,6 +536,9 @@ async function placeOrderWithMercadoPago() {
               <p class="truncate text-sm font-medium text-slate-700">
                 {{ item.productSnapshot?.name }}
               </p>
+              <p v-if="item.productSnapshot?.variantName" class="text-xs text-slate-500">
+                {{ item.productSnapshot.variantName }}
+              </p>
               <p class="text-xs text-slate-400">
                 {{ currency(item.unitPrice) }} x {{ item.quantity }}
               </p>
@@ -499,6 +561,7 @@ async function placeOrderWithMercadoPago() {
               {{ shippingLabel }}
             </span>
           </div>
+          <p v-if="shippingSummary" class="text-xs text-slate-400">{{ shippingSummary }}</p>
           <div class="flex justify-between border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
             <span>Total a pagar</span>
             <span>{{ currency(displayTotal) }}</span>

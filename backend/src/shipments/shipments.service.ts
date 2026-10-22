@@ -5,11 +5,26 @@ import { Shipment, ShipmentStatus } from './entities/shipment.entity';
 import {
   SHIPMENT_PROVIDER,
   ShipmentProvider,
-  ShipmentQuoteResult,
+  BranchInfo,
+  EnviaAddress,
+  PackageSpec,
+  ShippingOption,
 } from './providers/shipment-provider.interface';
-import { Order } from '../orders/entities/order.entity';
+import { Order, ShippingMethod, ShippingOriginSnapshot } from '../orders/entities/order.entity';
 import { EnviaProvider, PROVINCE_MAP } from './providers/envia.provider';
 import { ProductsService } from '../products/products.service';
+import { SettingsService } from '../settings/settings.service';
+
+/**
+ * Clave de configuración donde se guardan las sucursales de origen de Envia,
+ * indexadas por carrier (`{ oca: BranchInfo, andreani: BranchInfo }`).
+ * Cada paquetería tiene su propia sucursal: el `branch_code` de una sucursal de
+ * OCA no sirve para un envío de Andreani.
+ */
+export const ORIGIN_BRANCHES_SETTING = 'envia_origin_branches';
+
+/** Clave vieja (una sola sucursal para todos los carriers). Se migra sola. */
+export const LEGACY_ORIGIN_BRANCH_SETTING = 'envia_origin_branch';
 
 @Injectable()
 export class ShipmentsService {
@@ -18,10 +33,13 @@ export class ShipmentsService {
   constructor(
     @InjectRepository(Shipment)
     private readonly repo: Repository<Shipment>,
+    @InjectRepository(Order)
+    private readonly orderRepo: Repository<Order>,
     @Inject(SHIPMENT_PROVIDER)
     private readonly provider: ShipmentProvider,
     private readonly envia: EnviaProvider,
     private readonly productsService: ProductsService,
+    private readonly settings: SettingsService,
   ) {}
 
   // Defaults usados cuando un producto no tiene peso/medidas cargados en el admin.
@@ -29,6 +47,14 @@ export class ShipmentsService {
   private readonly DEFAULT_WIDTH_CM = 15;
   private readonly DEFAULT_HEIGHT_CM = 10;
   private readonly DEFAULT_LENGTH_CM = 15;
+
+  /** Radio (km) de sucursales que se muestran en el mapa del admin. */
+  private readonly DEFAULT_RADIUS_KM = 30;
+
+  /** Caché en memoria del mapa de sucursales (evita pegarle a Envia en cada refresh). */
+  private mapCache: { key: string; data: unknown; expiresAt: number } | null = null;
+
+  // ─── Paquetes ───────────────────────────────────────────────────────────────
 
   /**
    * Resuelve el paquete de una lista de items de pedido: peso total
@@ -82,73 +108,6 @@ export class ShipmentsService {
     };
   }
 
-  /**
-   * Cotiza el costo de envío para los datos del formulario de checkout.
-   * Acepta una lista de {productId, quantity} para calcular el peso total.
-   */
-  async quoteForOrderData(params: {
-    province: string;
-    city?: string;
-    postalCode: string;
-    items: { productId: string; quantity: number }[];
-  }): Promise<number> {
-    try {
-      const { weightKg, widthCm, heightCm, lengthCm, declaredValue, missingData } =
-        await this.resolvePackageFromItems(params.items);
-
-      if (missingData.length) {
-        this.logger.warn(
-          `Algunos productos sin peso/medidas cargados (se usan defaults ${this.DEFAULT_WIDTH_CM}x${this.DEFAULT_HEIGHT_CM}x${this.DEFAULT_LENGTH_CM} cm, ${this.DEFAULT_WEIGHT_KG} kg): %o`,
-          missingData.map((m) => `${m.name} (${m.productId})`),
-        );
-      }
-
-      const result = await this.quote({
-        provinceName: params.province,
-        city: params.city,
-        postalCode: params.postalCode,
-        weightKg,
-        widthCm,
-        heightCm,
-        lengthCm,
-        declaredValue,
-      });
-      return result.cost ?? 0;
-    } catch {
-      return 0;
-    }
-  }
-
-  /**
-   * Cotiza el costo de envío con Envia.com. Devuelve la opción a domicilio más barata.
-   * Si los datos de dimensiones no están disponibles se usan defaults.
-   */
-  async quote(params: {
-    provinceName: string;
-    city?: string;
-    postalCode: string;
-    weightKg?: number;
-    widthCm?: number;
-    heightCm?: number;
-    lengthCm?: number;
-    declaredValue?: number;
-  }): Promise<ShipmentQuoteResult & { isFree?: boolean }> {
-    const provinceCode = PROVINCE_MAP[params.provinceName] ?? 'DF';
-    return this.envia.quote({
-      provinceCode,
-      postalCode: params.postalCode,
-      city: params.city,
-      weightKg: params.weightKg ?? this.DEFAULT_WEIGHT_KG,
-      widthCm: params.widthCm ?? this.DEFAULT_WIDTH_CM,
-      heightCm: params.heightCm ?? this.DEFAULT_HEIGHT_CM,
-      lengthCm: params.lengthCm ?? this.DEFAULT_LENGTH_CM,
-      declaredValue: params.declaredValue,
-    });
-  }
-
-  /**
-   * Calcula los datos de paquete de una orden (peso, dimensiones, valor declarado).
-   */
   private async resolvePackage(order: Order): Promise<{
     weightKg: number;
     widthCm: number;
@@ -161,57 +120,556 @@ export class ShipmentsService {
     return { weightKg, widthCm, heightCm, lengthCm, declaredValue };
   }
 
+  // ─── Origen y destino ───────────────────────────────────────────────────────
+
   /**
-   * Calcula el costo de envío para una orden, teniendo en cuenta el peso real
-   * de los productos cargados en el carrito.
+   * Sucursales de origen configuradas, indexadas por carrier. Si quedó guardada
+   * la configuración vieja (una sola sucursal) se migra al formato nuevo.
    */
-  async quoteForOrder(order: Order): Promise<number> {
-    try {
-      const pkg = await this.resolvePackage(order);
-      const address = order.shippingAddress;
-      const result = await this.quote({
-        provinceName: address.province,
-        city: address.city,
-        postalCode: address.postalCode,
+  async getOriginBranches(): Promise<Record<string, BranchInfo>> {
+    const map = (await this.settings.get<Record<string, BranchInfo>>(ORIGIN_BRANCHES_SETTING)) ?? {};
+    const legacy = await this.settings.get<BranchInfo>(LEGACY_ORIGIN_BRANCH_SETTING);
+    if (legacy?.branchCode && legacy.carrier && !map[legacy.carrier]?.branchCode) {
+      map[legacy.carrier] = legacy;
+      await this.settings.set(ORIGIN_BRANCHES_SETTING, map);
+      await this.settings.remove(LEGACY_ORIGIN_BRANCH_SETTING);
+    }
+    return map;
+  }
+
+  /**
+   * Dirección de origen de los envíos para un carrier concreto. Si el admin
+   * definió una sucursal de Envia para esa paquetería, el paquete se deja ahí y
+   * desde ahí se despacha; si no, se usa la dirección configurada en el .env.
+   */
+  async resolveOriginForCarrier(
+    carrier: string,
+  ): Promise<{ address: EnviaAddress; branch: BranchInfo | null }> {
+    const envOrigin = this.envia.envOrigin();
+    const map = await this.getOriginBranches();
+    const branch = map[carrier];
+    if (!branch?.branchCode) {
+      return { address: envOrigin, branch: null };
+    }
+    return { address: this.branchToAddress(branch, envOrigin), branch };
+  }
+
+  /** Convierte una sucursal de Envia en la dirección de origen que espera la API. */
+  private branchToAddress(branch: BranchInfo, envOrigin: EnviaAddress): EnviaAddress {
+    return {
+      name: branch.reference || envOrigin.name,
+      company: envOrigin.company,
+      email: envOrigin.email,
+      phone: branch.phone || envOrigin.phone,
+      street: branch.address?.street || '',
+      number: branch.address?.number,
+      city: branch.address?.city || envOrigin.city,
+      state: branch.address?.state || envOrigin.state,
+      country: 'AR',
+      postalCode: branch.address?.postalCode || envOrigin.postalCode,
+      branchCode: branch.branchCode,
+    };
+  }
+
+  /**
+   * Orígenes a usar para cotizar. Sólo se cotizan los carriers con sucursal de
+   * origen configurada: el paquete se deja en esa sucursal y desde ahí el
+   * carrier lo lleva hasta la casa del comprador.
+   */
+  private async buildOrigins(carriers: string[]): Promise<{
+    origins: Record<string, EnviaAddress>;
+    branches: Record<string, BranchInfo>;
+    carriers: string[];
+  }> {
+    const envOrigin = this.envia.envOrigin();
+    const map = await this.getOriginBranches();
+    // Sólo se cotizan los carriers con sucursal de origen configurada: el
+    // paquete se deja ahí y desde ahí el carrier lo lleva a la casa del
+    // comprador. Sin sucursal de origen no hay envío posible.
+    const list = carriers.filter((carrier) => map[carrier]?.branchCode);
+
+    if (!list.length) {
+      this.logger.warn(
+        'No hay ninguna sucursal de origen configurada: se necesita una para cotizar entregas a domicilio (Admin → Sucursales Envia).',
+      );
+      throw new BadRequestException(
+        'No hay entregas a domicilio disponibles por el momento.',
+      );
+    }
+
+    const origins: Record<string, EnviaAddress> = {};
+    const branches: Record<string, BranchInfo> = {};
+    for (const carrier of list) {
+      const branch = map[carrier];
+      origins[carrier] = this.branchToAddress(branch, envOrigin);
+      branches[carrier] = branch;
+    }
+    return { origins, branches, carriers: list };
+  }
+
+  /** Carriers con los que se cotiza (los configurados en el .env o todos los de Envia). */
+  private async resolveCarriers(): Promise<string[]> {
+    const configured = this.envia.getCarrierSlugs();
+    if (configured?.length) return configured;
+    const all = await this.envia.getCarriers();
+    return all.map((c) => c.name);
+  }
+
+  private buildDestination(params: {
+    province: string;
+    city?: string;
+    postalCode: string;
+    address?: string;
+    number?: string;
+    name?: string;
+    phone?: string;
+    email?: string;
+    branchCode?: string;
+  }): EnviaAddress {
+    return {
+      name: params.name || 'Cliente',
+      phone: params.phone || '',
+      email: params.email || '',
+      street: params.address || '',
+      number: params.number,
+      city: params.city || '',
+      state: PROVINCE_MAP[params.province] ?? 'DF',
+      country: 'AR',
+      postalCode: params.postalCode || '',
+      branchCode: params.branchCode,
+    };
+  }
+
+  // ─── Cotización ─────────────────────────────────────────────────────────────
+
+  /**
+   * Cotiza todas las opciones de envío disponibles para una dirección.
+   * Cada opción trae carrier, servicio, modalidad (domicilio / sucursal),
+   * precio real de Envia y tiempo estimado, para que el comprador elija.
+   */
+  async quoteOptions(params: {
+    province: string;
+    city?: string;
+    postalCode: string;
+    address?: string;
+    number?: string;
+    items: { productId: string; quantity: number }[];
+  }): Promise<ShippingOption[]> {
+    const { options } = await this.quoteWithOrigins(params);
+    return options;
+  }
+
+  /**
+   * Igual que `quoteOptions` pero además devuelve el origen usado por cada
+   * carrier: así el pedido puede guardar el origen con el que se cotizó y la
+   * etiqueta se genera siempre desde el mismo lugar.
+   */
+  private async quoteWithOrigins(params: {
+    province: string;
+    city?: string;
+    postalCode: string;
+    address?: string;
+    number?: string;
+    items: { productId: string; quantity: number }[];
+  }): Promise<{
+    options: ShippingOption[];
+    origins: Record<string, EnviaAddress>;
+    branches: Record<string, BranchInfo>;
+  }> {
+    const pkg = await this.resolvePackageFromItems(params.items);
+    if (pkg.missingData.length) {
+      this.logger.warn(
+        `Algunos productos sin peso/medidas cargados (se usan defaults ${this.DEFAULT_WIDTH_CM}x${this.DEFAULT_HEIGHT_CM}x${this.DEFAULT_LENGTH_CM} cm, ${this.DEFAULT_WEIGHT_KG} kg): %o`,
+        pkg.missingData.map((m) => `${m.name} (${m.productId})`),
+      );
+    }
+
+    const carriers = await this.resolveCarriers();
+    const { origins, branches } = await this.buildOrigins(carriers);
+    const destination = this.buildDestination(params);
+    const packages: PackageSpec[] = [
+      {
         weightKg: pkg.weightKg,
         widthCm: pkg.widthCm,
         heightCm: pkg.heightCm,
         lengthCm: pkg.lengthCm,
         declaredValue: pkg.declaredValue,
+        content: 'Producto',
+      },
+    ];
+
+    const options = await this.envia.quoteOptions({
+      origins,
+      fallbackOrigin: this.envia.envOrigin(),
+      destination,
+      packages,
+      carriers: Object.keys(origins),
+    });
+
+    return { options, origins, branches };
+  }
+
+  /**
+   * Resuelve la opción de envío que se guarda en la orden. Recotiza en el
+   * servidor (el precio siempre es el real de Envia, nunca el que manda el
+   * cliente) y valida que la sucursal elegida pertenezca a la opción.
+   *
+   * Devuelve también el origen con el que se cotizó (la sucursal de origen del
+   * carrier elegido) para congelarlo en el pedido.
+   */
+  async resolveShippingOption(params: {
+    province: string;
+    city?: string;
+    postalCode: string;
+    address?: string;
+    number?: string;
+    items: { productId: string; quantity: number }[];
+    optionId?: string;
+    branchCode?: string;
+    branchCarrier?: string;
+  }): Promise<{
+    option: ShippingOption;
+    branch: BranchInfo | null;
+    origin: EnviaAddress;
+    originBranch: BranchInfo | null;
+  }> {
+    const { options, origins, branches } = await this.quoteWithOrigins({
+      province: params.province,
+      city: params.city,
+      postalCode: params.postalCode,
+      address: params.address,
+      number: params.number,
+      items: params.items,
+    });
+
+    if (!options.length) {
+      throw new BadRequestException('No hay opciones de envío disponibles para esa dirección.');
+    }
+
+    const option = params.optionId
+      ? options.find((o) => o.id === params.optionId)
+      : options[0];
+
+    if (!option) {
+      throw new BadRequestException(
+        'La opción de envío elegida ya no está disponible. Volvé a cotizar.',
+      );
+    }
+
+    let branch: BranchInfo | null = null;
+    if (option.deliveryMode === 'BRANCH') {
+      if (!params.branchCode) {
+        throw new BadRequestException('Elegí la sucursal donde retirás el paquete.');
+      }
+      branch =
+        option.branches.find(
+          (b) =>
+            b.branchCode === params.branchCode &&
+            (!params.branchCarrier || b.carrier === params.branchCarrier),
+        ) ?? null;
+      if (!branch) {
+        throw new BadRequestException('La sucursal elegida no está disponible para ese envío.');
+      }
+    }
+
+    const origin = origins[option.carrier] ?? this.envia.envOrigin();
+
+    return { option, branch, origin, originBranch: branches[option.carrier] ?? null };
+  }
+
+  /** Costo de envío de una orden ya persistida (usa la opción que se eligió). */
+  async quoteForOrder(order: Order): Promise<number> {
+    if (order.shippingMethod === ShippingMethod.PICKUP) return 0;
+    if (order.shippingOption?.cost != null) return Number(order.shippingOption.cost);
+    try {
+      const pkg = await this.resolvePackage(order);
+      const address = order.shippingAddress;
+      const options = await this.quoteOptions({
+        province: address.province,
+        city: address.city,
+        postalCode: address.postalCode,
+        address: address.address,
+        number: address.number,
+        items: order.items?.map((i) => ({ productId: i.productId, quantity: i.quantity })) ?? [],
       });
-      return result.cost ?? 0;
+      return options[0]?.cost ?? 0;
     } catch {
       return 0;
     }
   }
 
-  async createForOrder(order: Order): Promise<Shipment> {
+  // ─── Sucursales y mapa (admin) ──────────────────────────────────────────────
+
+  /**
+   * Datos para el mapa del admin: dirección de TOROX (pin azul) y las
+   * sucursales de Envia cercanas (pines rojos).
+   */
+  async getMapData(
+    params: { carrier?: string; type?: 1 | 2 | 3; limit?: number; radiusKm?: number } = {},
+  ) {
+    const cacheKey = `${params.carrier ?? ''}|${params.type ?? 3}|${params.limit ?? 25}|${params.radiusKm ?? this.DEFAULT_RADIUS_KM}`;
+    if (
+      this.mapCache &&
+      this.mapCache.key === cacheKey &&
+      this.mapCache.expiresAt > Date.now()
+    ) {
+      return this.mapCache.data;
+    }
+    const data = await this.buildMapData(params);
+    this.mapCache = { key: cacheKey, data, expiresAt: Date.now() + 5 * 60 * 1000 };
+    return data;
+  }
+
+  private async buildMapData(params: {
+    carrier?: string;
+    type?: 1 | 2 | 3;
+    limit?: number;
+    radiusKm?: number;
+  }) {
+    const envOrigin = this.envia.envOrigin();
+    const originBranches = Object.values(await this.getOriginBranches());
+    const coords = await this.envia.geocode(envOrigin);
+
+    const configured = this.envia.getCarrierSlugs();
+    const carriers = params.carrier
+      ? [params.carrier]
+      : configured ?? (await this.envia.getCarriers()).map((c) => c.name);
+
+    const results = await Promise.allSettled(
+      carriers.map((carrier) =>
+        this.envia.getBranches({
+          carrier,
+          type: params.type ?? 3,
+          zipcode: envOrigin.postalCode,
+          city: envOrigin.city,
+          state: envOrigin.state,
+          limit: params.limit ?? 25,
+        }),
+      ),
+    );
+
+    const branches: BranchInfo[] = [];
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        branches.push(...result.value);
+      } else {
+        this.logger.warn(
+          `No se pudieron listar sucursales de ${carriers[index]}: ${result.reason?.message}`,
+        );
+      }
+    });
+
+    branches.sort((a, b) => (a.distanceKm ?? Number.MAX_SAFE_INTEGER) - (b.distanceKm ?? Number.MAX_SAFE_INTEGER));
+
+    // Envia devuelve sucursales de todo el país y en muchas de ellas no viene
+    // la distancia: la calculamos nosotros a partir de las coordenadas para
+    // que el mapa muestre sólo lo que de verdad está cerca del local.
+    const originLat = coords?.latitude ?? null;
+    const originLng = coords?.longitude ?? null;
+    for (const branch of branches) {
+      const lat = branch.address?.latitude;
+      const lng = branch.address?.longitude;
+      if (branch.distanceKm == null && lat != null && lng != null && originLat != null && originLng != null) {
+        branch.distanceKm = this.distanceKm(originLat, originLng, lat, lng);
+      }
+    }
+    branches.sort((a, b) => (a.distanceKm ?? Number.MAX_SAFE_INTEGER) - (b.distanceKm ?? Number.MAX_SAFE_INTEGER));
+
+    // Para el mapa y el listado nos quedamos sólo con las que están cerca.
+    const radius = params.radiusKm ?? this.DEFAULT_RADIUS_KM;
+    const near = branches.filter(
+      (b) => b.distanceKm == null || b.distanceKm <= radius,
+    );
+    const nearby = near.length ? near : branches.slice(0, 10);
+
+    return {
+      origin: {
+        ...envOrigin,
+        latitude: coords?.latitude ?? null,
+        longitude: coords?.longitude ?? null,
+        geocodeSource: coords?.source ?? null,
+      },
+      /** Sucursal de origen configurada para cada paquetería. */
+      originBranches,
+      branches: nearby,
+      totalBranches: branches.length,
+      radiusKm: radius,
+      carriers: await this.envia.getCarriers(),
+      configuredCarriers: configured ?? [],
+      environment: {
+        apiBase: this.envia.apiBase,
+        queriesBase: this.envia.queriesBase,
+        isSandbox: this.envia.isSandbox,
+      },
+    };
+  }
+
+  /** Distancia en línea recta entre dos coordenadas (km). */
+  private distanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  /**
+   * Guarda la sucursal donde el administrador deja los paquetes. La sucursal
+   * queda asignada a SU paquetería: el `branch_code` de una sucursal de OCA no
+   * sirve para un envío de Andreani.
+   */
+  async setOriginBranch(branch: BranchInfo): Promise<BranchInfo> {
+    if (!branch?.branchCode) {
+      throw new BadRequestException('La sucursal de origen no tiene código.');
+    }
+    if (!branch.carrier) {
+      throw new BadRequestException('La sucursal de origen necesita su paquetería (carrier).');
+    }
+    const map = await this.getOriginBranches();
+    map[branch.carrier] = branch;
+    await this.settings.set(ORIGIN_BRANCHES_SETTING, map);
+    await this.settings.remove(LEGACY_ORIGIN_BRANCH_SETTING);
+    this.mapCache = null;
+    return branch;
+  }
+
+  /**
+   * Vuelve a usar la dirección del .env como origen. Si se pasa un carrier sólo
+   * se borra el origen de esa paquetería.
+   */
+  async clearOriginBranch(carrier?: string): Promise<void> {
+    if (carrier) {
+      const map = await this.getOriginBranches();
+      delete map[carrier];
+      await this.settings.set(ORIGIN_BRANCHES_SETTING, map);
+      this.logger.warn(`Origen de envíos quitado para ${carrier}.`);
+    } else {
+      await this.settings.remove(ORIGIN_BRANCHES_SETTING);
+      await this.settings.remove(LEGACY_ORIGIN_BRANCH_SETTING);
+      this.logger.warn(
+        'Origen de envíos quitado por completo: sin sucursal de origen no se pueden cotizar entregas a domicilio.',
+      );
+    }
+    this.mapCache = null;
+  }
+
+  // ─── Envíos ─────────────────────────────────────────────────────────────────
+
+  async createForOrder(order: Order): Promise<Shipment | null> {
     const existing = await this.repo.findOne({ where: { orderId: order.id } });
     if (existing) return existing;
+
+    // Los pedidos con retiro en el local de TOROX no generan guía de envío.
+    if (order.shippingMethod === ShippingMethod.PICKUP) return null;
 
     const address = order.shippingAddress;
     const pkg = await this.resolvePackage(order);
 
-    const result = await this.provider.createShipment({
-      orderNumber: order.orderNumber,
-      customerName: order.customerName,
-      customerEmail: order.customerEmail,
-      customerPhone: order.customerPhone,
-      address: `${address.address} ${address.number}`.trim(),
+    // Si la orden no tiene opción de envío guardada (pedidos antiguos), se
+    // cotiza al momento y se usa la opción más barata.
+    let option = order.shippingOption;
+    if (!option) {
+      const options = await this.quoteOptions({
+        province: address.province,
+        city: address.city,
+        postalCode: address.postalCode,
+        address: address.address,
+        number: address.number,
+        items: order.items?.map((i) => ({ productId: i.productId, quantity: i.quantity })) ?? [],
+      });
+      const cheapest = options[0];
+      if (!cheapest) {
+        throw new BadRequestException('Envia.com no devolvió cotizaciones para este pedido.');
+      }
+      option = {
+        id: cheapest.id,
+        carrier: cheapest.carrier,
+        carrierName: cheapest.carrierName,
+        service: cheapest.service,
+        serviceDescription: cheapest.serviceDescription,
+        dropOff: cheapest.dropOff,
+        dropOffDescription: cheapest.dropOffDescription,
+        deliveryMode: cheapest.deliveryMode,
+        pickupMode: cheapest.pickupMode,
+        cost: cheapest.cost,
+        currency: cheapest.currency,
+        deliveryEstimate: cheapest.deliveryEstimate,
+        deliveryDate: cheapest.deliveryDate,
+      };
+    }
+
+    const destination = this.buildDestination({
+      province: address.province,
       city: address.city,
       postalCode: address.postalCode,
-      provinceCode: PROVINCE_MAP[address.province] ?? 'DF',
-      weightKg: pkg.weightKg,
-      widthCm: pkg.widthCm,
-      heightCm: pkg.heightCm,
-      lengthCm: pkg.lengthCm,
+      address: `${address.address} ${address.number ?? ''}`.trim(),
+      number: address.number,
+      name: order.customerName,
+      phone: order.customerPhone,
+      email: order.customerEmail,
+      branchCode: order.shippingBranch?.branchCode,
+    });
+
+    // El origen está congelado en el pedido: la etiqueta sale siempre desde la
+    // misma sucursal con la que se cotizó (aunque el admin después cambie el
+    // origen configurado). Los pedidos viejos, sin origen guardado, usan el
+    // origen vigente del carrier.
+    const origin = order.shippingOrigin
+      ? this.snapshotToAddress(order.shippingOrigin)
+      : (await this.resolveOriginForCarrier(option.carrier)).address;
+
+    const result = await this.provider.createShipment({
+      orderNumber: order.orderNumber,
+      origin,
+      destination,
+      package: {
+        weightKg: pkg.weightKg,
+        widthCm: pkg.widthCm,
+        heightCm: pkg.heightCm,
+        lengthCm: pkg.lengthCm,
+        declaredValue: pkg.declaredValue,
+        content: 'Producto',
+      },
+      carrier: option.carrier,
+      service: option.service,
+      dropOff: option.dropOff,
       declaredValue: pkg.declaredValue,
     });
 
     const shipment = this.repo.create({
       orderId: order.id,
       trackingNumber: result.trackingNumber,
-      carrier: result.carrierName || 'Envia.com',
+      carrier: option.carrierName || result.carrierName || 'Envia.com',
+      service: option.service ?? null,
+      dropOff: option.dropOff ?? null,
+      branchCode: order.shippingBranch?.branchCode ?? null,
+      branchAddress: order.shippingBranch
+        ? [
+            order.shippingBranch.address?.street,
+            order.shippingBranch.address?.number,
+            order.shippingBranch.address?.city,
+          ]
+            .filter(Boolean)
+            .join(' ')
+        : null,
+      originAddress: [
+        origin.street,
+        origin.number,
+        origin.city,
+      ]
+        .filter(Boolean)
+        .join(' '),
+      originBranchCode: origin.branchCode ?? null,
+      declaredValue: pkg.declaredValue,
+      packageInfo: {
+        weightKg: pkg.weightKg,
+        widthCm: pkg.widthCm,
+        heightCm: pkg.heightCm,
+        lengthCm: pkg.lengthCm,
+      },
       status: result.status,
       estimatedDelivery: result.estimatedDelivery,
       events: result.events,
@@ -221,6 +679,43 @@ export class ShipmentsService {
     });
 
     return this.repo.save(shipment);
+  }
+
+  /** Convierte el origen congelado del pedido en la dirección que espera Envia. */
+  private snapshotToAddress(snapshot: ShippingOriginSnapshot): EnviaAddress {
+    const address = snapshot.address ?? ({} as EnviaAddress);
+    return {
+      name: address.name ?? 'TOROX',
+      company: address.company,
+      email: address.email,
+      phone: address.phone,
+      street: address.street ?? '',
+      number: address.number,
+      city: address.city ?? '',
+      state: address.state ?? 'DF',
+      country: address.country ?? 'AR',
+      postalCode: address.postalCode ?? '',
+      branchCode: snapshot.branchCode ?? address.branchCode,
+    };
+  }
+
+  /**
+   * Genera (o reintenta generar) la guía de un pedido puntual. Se usa desde el
+   * admin cuando el envío no se pudo crear al aprobar el pago.
+   */
+  async createForOrderById(orderId: string): Promise<Shipment> {
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      relations: { items: true },
+    });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    const shipment = await this.createForOrder(order);
+    if (!shipment) {
+      throw new BadRequestException(
+        'Este pedido se retira en el local de TOROX: no genera guía de envío.',
+      );
+    }
+    return shipment;
   }
 
   async advance(id: string): Promise<Shipment> {
@@ -274,6 +769,43 @@ export class ShipmentsService {
   async getLabelUrl(id: string): Promise<string | null> {
     const shipment = await this.findOne(id);
     return shipment.labelUrl ?? null;
+  }
+
+  /**
+   * Descarga el PDF de la etiqueta desde Envia para que el admin la baje con
+   * un nombre útil (TORX-000123-etiqueta.pdf). El PDF vive en los servidores
+   * de Envia: el backend lo trae y lo devuelve como adjunto.
+   */
+  async getLabelFile(id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const shipment = await this.findOne(id);
+    const url = shipment.labelUrl;
+    if (!url) {
+      throw new BadRequestException(
+        'Este envío todavía no tiene etiqueta. Generá la guía en Envia.com primero.',
+      );
+    }
+
+    let buffer: Buffer;
+    try {
+      const response = await fetch(url, { redirect: 'follow' });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const contentType = response.headers.get('content-type') ?? '';
+      const data = Buffer.from(await response.arrayBuffer());
+      if (contentType.includes('text/html') || data.subarray(0, 4).toString() !== '%PDF') {
+        throw new Error('Envia no devolvió un PDF');
+      }
+      buffer = data;
+    } catch (error: any) {
+      throw new BadRequestException(
+        `No se pudo descargar la etiqueta de Envia (${error?.message}). Abrila desde el panel de Envia.com.`,
+      );
+    }
+
+    const order = await this.orderRepo.findOne({ where: { id: shipment.orderId } });
+    const filename = `${order?.orderNumber ?? shipment.trackingNumber}-etiqueta.pdf`;
+    return { buffer, filename };
   }
 
   /**

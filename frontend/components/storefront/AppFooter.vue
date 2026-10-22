@@ -4,6 +4,10 @@ import Instagram from '~/assets/icon-instagram.png'
 import Facebook from '~/assets/icon-facebook.png'
 import TikTok from '~/assets/icon-tiktok.png'
 import WhatsApp from '~/assets/icon-wspp.png'
+import MercadoPago from '~/assets/payments/mercadopago.svg'
+import Visa from '~/assets/payments/visa.svg'
+import Mastercard from '~/assets/payments/mastercard.svg'
+import NaranjaX from '~/assets/payments/naranjax.svg'
 import logo from '~/assets/logo.png'
 import { useAuthStore } from '~/stores/auth'
 
@@ -75,43 +79,76 @@ const ordersLink = computed(() => (auth.isAuthenticated ? '/cuenta/compras' : '/
           <li class="flex items-center gap-2.5"><Mail class="h-4 w-4 text-brand-400" /> toroxseguridad@gmail.com</li>
           <li class="flex items-center gap-2.5"><MapPin class="h-4 w-4 text-brand-400" /> Buenos Aires, Argentina</li>
         </ul>
-        <div class="mt-8 flex gap-3">
-          <a
-            href="https://www.instagram.com/torox.arg/"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
-            aria-label="Instagram"
-          >
-            <img :src="Instagram" alt="Instagram" class="h-4.5 w-4.5" />
-          </a>
-          <a
-            href="https://www.facebook.com/profile.php?id=61593927764597"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
-            aria-label="Facebook"
-          >
-            <img :src="Facebook" alt="Facebook" class="h-4.5 w-4.5" />
-          </a>
-          <a
-            href="https://www.tiktok.com/@torox.arg"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
-            aria-label="TikTok"
-          >
-            <img :src="TikTok" alt="TikTok" class="h-4.5 w-4.5" />
-          </a>
-          <a
-            href="https://wa.me/5491171383512?text=Hola!%20Quisiera%20saber%20m%C3%A1s%20informaci%C3%B3n%20sobre%20sus%20productos."
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex h-10 w-10 items-center justify-center rounded-full bg-[\#25D366] text-white shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
-            aria-label="WhatsApp"
-          >
-            <img :src="WhatsApp" alt="WhatsApp" class="h-4.5 w-4.5" />
-          </a>
+        <div class="mt-8">
+          <p class="text-[11px] font-semibold text-slate-300">Seguinos!</p>
+          <div class="mt-3 flex items-center gap-3">
+            <a
+              href="https://www.instagram.com/torox.arg/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
+              aria-label="Instagram"
+            >
+              <img :src="Instagram" alt="Instagram" class="h-8 w-8 object-contain" />
+            </a>
+            <a
+              href="https://www.facebook.com/profile.php?id=61593927764597"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
+              aria-label="Facebook"
+            >
+              <img :src="Facebook" alt="Facebook" class="h-8 w-8 object-contain" />
+            </a>
+            <a
+              href="https://www.tiktok.com/@torox.arg"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
+              aria-label="TikTok"
+            >
+              <img :src="TikTok" alt="TikTok" class="h-8 w-8 object-contain" />
+            </a>
+            <a
+              href="https://wa.me/5491171383512?text=Hola!%20Quisiera%20saber%20m%C3%A1s%20informaci%C3%B3n%20sobre%20sus%20productos."
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
+              aria-label="WhatsApp"
+            >
+              <img :src="WhatsApp" alt="WhatsApp" class="h-8 w-8 object-contain" />
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="border-t border-white/10">
+      <div class="container-torox flex flex-col gap-4 py-6 lg:flex-row lg:items-center lg:justify-between">
+        <p class="text-[11px] leading-relaxed text-slate-400">
+          Pagá con Mercado Pago, Tarjetas de crédito y débito de todos los bancos.
+        </p>
+        <div class="flex flex-nowrap items-center gap-3">
+          <img
+            :src="MercadoPago"
+            alt="Mercado Pago"
+            class="h-6 w-auto min-w-0 shrink object-contain sm:h-8"
+          />
+          <img
+            :src="Visa"
+            alt="Visa"
+            class="h-6 w-auto min-w-0 shrink rounded-[5px] object-contain shadow-sm ring-1 ring-white/15 sm:h-8"
+          />
+          <img
+            :src="Mastercard"
+            alt="Mastercard"
+            class="h-6 w-auto min-w-0 shrink rounded-[5px] object-contain shadow-sm ring-1 ring-white/15 sm:h-8"
+          />
+          <img
+            :src="NaranjaX"
+            alt="Naranja X"
+            class="h-6 w-auto min-w-0 shrink object-contain sm:h-8"
+          />
         </div>
       </div>
     </div>

@@ -8,17 +8,20 @@ import { ShipmentsController } from './shipments.controller';
 import { EnviaWebhookController } from './envia-webhook.controller';
 import { WebhookIdempotencyService } from './webhook-idempotency.service';
 import { Shipment } from './entities/shipment.entity';
+import { Order } from '../orders/entities/order.entity';
 import { EnviaProvider } from './providers/envia.provider';
 import { SHIPMENT_PROVIDER } from './providers/shipment-provider.interface';
 import { ProductsModule } from '../products/products.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Shipment]),
+    TypeOrmModule.forFeature([Shipment, Order]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     HttpModule,
     ConfigModule,
     ProductsModule,
+    SettingsModule,
   ],
   controllers: [ShipmentsController, EnviaWebhookController],
   providers: [

@@ -25,6 +25,17 @@ export class SpecGroupDto {
   rows: SpecRowDto[];
 }
 
+export class ProductVariantDto {
+  /** Present when updating an existing variant; omitted for new ones. */
+  @IsOptional() @IsString() id?: string;
+  @IsString() @IsNotEmpty() name: string;
+  @IsOptional() @IsString() sku?: string;
+  @IsOptional() @IsNumber() @Min(0) stock?: number;
+  @IsOptional() @IsArray() @ArrayMaxSize(12) @IsString({ each: true }) images?: string[];
+  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional() @IsNumber() @Min(0) sortOrder?: number;
+}
+
 export class CreateProductDto {
   @IsString() @IsNotEmpty() name: string;
   @IsOptional() @IsString() slug?: string;
@@ -38,6 +49,13 @@ export class CreateProductDto {
   @IsOptional() @IsNumber() @Min(0) cost?: number;
   @IsOptional() @IsNumber() @Min(0) stock?: number;
   @IsOptional() @IsArray() images?: string[];
+
+  /** Label of the variation axis shown in the storefront, e.g. "Color". */
+  @IsOptional() @IsString() variantName?: string | null;
+
+  @IsOptional() @IsArray() @ArrayMaxSize(50)
+  @ValidateNested({ each: true }) @Type(() => ProductVariantDto)
+  variants?: ProductVariantDto[];
   @IsOptional() @IsObject() specifications?: Record<string, string>;
 
   @IsOptional() @IsArray() @ArrayMaxSize(2) @IsString({ each: true })

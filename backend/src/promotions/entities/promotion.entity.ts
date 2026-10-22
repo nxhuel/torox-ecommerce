@@ -4,6 +4,9 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  AfterLoad,
+  AfterInsert,
+  AfterUpdate,
 } from 'typeorm';
 
 export enum PromotionType {
@@ -51,12 +54,21 @@ export class Promotion {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  get isCurrentlyActive(): boolean {
-    const now = new Date();
-    return (
-      this.isActive &&
-      new Date(this.startDate) <= now &&
-      new Date(this.endDate) >= now
-    );
+  /**
+   * Computed status exposed in the API response. It has to be a real own
+   * property (not a getter): the global ClassSerializerInterceptor uses
+   * class-transformer, which drops prototype getters, so the admin UI received
+   * `undefined` and always rendered "Inactiva".
+   */
+  isCurrentlyActive: boolean;
+
+  @AfterLoad()
+  @AfterInsert()
+  @AfterUpdate()
+  computeIsCurrentlyActive(): void {
+    const now = Date.now();
+    const start = new Date(this.startDate).getTime();
+    const end = new Date(this.endDate).getTime();
+    this.isCurrentlyActive = Boolean(this.isActive) && start <= now && now <= end;
   }
 }

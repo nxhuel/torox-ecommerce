@@ -52,10 +52,9 @@ export const useCartStore = defineStore('cart', {
       const auth = useAuthStore()
       this.cart = await cartService.get(auth.isAuthenticated ? undefined : this.session())
     },
-    async add(productId: string, quantity = 1) {
-      const auth = useAuthStore()
+    async add(productId: string, quantity = 1, variantId?: string | null) {
       if (!this.cart) await this.init()
-      await cartService.addItem(this.cart!.id, productId, quantity)
+      await cartService.addItem(this.cart!.id, productId, quantity, variantId)
       await this.refresh()
     },
     async update(itemId: string, quantity: number) {

@@ -66,7 +66,7 @@ function productImage(item: any) {
                 </button>
               </div>
               <p class="mt-1 text-xs text-slate-400">
-                {{ item.productSnapshot?.brand || 'TOROX' }} • SKU: {{ item.productId.slice(0, 8).toUpperCase() }}
+                {{ item.productSnapshot?.brand || 'TOROX' }}<template v-if="item.productSnapshot?.variantName"> • {{ item.productSnapshot.variantName }}</template> • SKU: {{ item.productId.slice(0, 8).toUpperCase() }}
               </p>
               <div class="mt-auto flex flex-wrap items-center justify-between gap-3 pt-3">
                 <QuantitySelector :model-value="item.quantity" :max="item.productSnapshot?.stock || 99" @update:model-value="update(item.id, $event)" />

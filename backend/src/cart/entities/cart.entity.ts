@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { ProductVariant } from '../../products/entities/product-variant.entity';
 
 @Entity('carts')
 export class Cart {
@@ -40,6 +41,14 @@ export class CartItem {
 
   @Column({ name: 'product_id' })
   productId: string;
+
+  @Column({ type: 'uuid', nullable: true, name: 'variant_id' })
+  variantId: string | null;
+
+  /** Removing a variant removes the cart lines that referenced it. */
+  @ManyToOne(() => ProductVariant, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'variant_id' })
+  variant: ProductVariant | null;
 
   @Column()
   quantity: number;

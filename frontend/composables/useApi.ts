@@ -5,6 +5,8 @@ interface ApiOptions {
   body?: Record<string, unknown> | any[]
   query?: Record<string, unknown>
   headers?: Record<string, string>
+  /** 'blob' devuelve el archivo crudo (por ejemplo el PDF de la etiqueta). */
+  responseType?: 'json' | 'blob' | 'arrayBuffer'
 }
 
 /**
@@ -31,7 +33,15 @@ export function useApi() {
         body: options.body as any,
         query: options.query,
         headers,
+        ...(options.responseType && options.responseType !== 'json'
+          ? { responseType: options.responseType }
+          : {}),
       })
+
+      // Las respuestas binarias (PDF de la etiqueta) no vienen envueltas.
+      if (options.responseType === 'blob' || options.responseType === 'arrayBuffer') {
+        return raw as T
+      }
 
       if (raw && typeof raw === 'object' && 'success' in raw) {
         if (raw.success === false) {

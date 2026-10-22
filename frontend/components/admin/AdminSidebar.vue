@@ -10,6 +10,7 @@ import {
   Bell,
   X,
   Store,
+  MapPin,
 } from 'lucide-vue-next'
 import logo from '~/assets/logo.png'
 
@@ -25,6 +26,7 @@ const links = [
   { to: '/admin/productos', label: 'Productos', icon: Package },
   { to: '/admin/categorias', label: 'Categorías', icon: FolderTree },
   { to: '/admin/pedidos', label: 'Pedidos', icon: ClipboardList },
+  { to: '/admin/sucursales', label: 'Sucursales Envia', icon: MapPin },
   { to: '/admin/clientes', label: 'Clientes', icon: Users },
   { to: '/admin/promociones', label: 'Promociones', icon: Tag },
   { to: '/admin/finanzas', label: 'Finanzas', icon: Wallet },

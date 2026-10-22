@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ShoppingCart, Heart, Check, Star } from 'lucide-vue-next'
+import { ShoppingCart, Heart, Check, Star, Gift } from 'lucide-vue-next'
 import type { Product } from '~/types'
 import { useAuthStore } from '~/stores/auth'
 import { useCartStore } from '~/stores/cart'
@@ -21,9 +21,10 @@ const added = ref(false)
 
 const discount = computed(() => {
   const p = props.product
-  const pct = p.discountPercentage != null ? Number(p.discountPercentage) : 0
-  if (pct <= 0 || p.price <= p.finalPrice) return null
-  return `${percentage(pct)}% OFF`
+  const price = Number(p.price)
+  const finalPrice = Number(p.finalPrice)
+  if (price <= 0 || price <= finalPrice) return null
+  return `${percentage(((price - finalPrice) / price) * 100)}% OFF`
 })
 
 async function addToCart() {
@@ -70,7 +71,14 @@ async function toggleFavorite() {
     <!-- Featured top ribbon -->
     <NuxtLink :to="`/especificacion/${product.slug}`" class="relative block aspect-square overflow-hidden !bg-white">
       <AppImage :src="product.images?.[0]" :alt="product.name" :seed="product.slug" class="h-full w-full object-contain" />
-      <div class="absolute left-3 top-3 flex flex-col gap-1.5">
+      <div
+        v-if="product.promotion"
+        class="absolute left-0 top-0 z-10 inline-flex max-w-[78%] items-center gap-1.5 rounded-br-xl bg-gradient-to-r from-rose-600 via-rose-500 to-red-500 px-3 py-1.5 text-white shadow-md"
+      >
+        <Gift class="h-3.5 w-3.5 shrink-0" />
+        <span class="truncate text-[11px] font-bold uppercase tracking-wide">{{ product.promotion.name }}</span>
+      </div>
+      <div class="absolute left-3 flex flex-col gap-1.5" :class="product.promotion ? 'top-12' : 'top-3'">
         <span v-if="discount" class="rounded-md bg-green-500 px-2 py-0.5 text-xs font-bold text-white">
           {{ discount }}
         </span>
@@ -103,7 +111,6 @@ async function toggleFavorite() {
         <PriceTag
           :price="product.finalPrice"
           :original-price="product.price"
-          :discount-percentage="product.discountPercentage"
           size="sm"
         />
         <p class="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">

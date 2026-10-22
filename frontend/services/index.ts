@@ -1,6 +1,8 @@
 import { useApi } from '~/composables/useApi'
 import { useRuntimeConfig } from '#app'
 import type {
+  BranchInfo,
+  BranchesMapData,
   Category,
   DashboardMetrics,
   FinanceMovement,
@@ -11,6 +13,7 @@ import type {
   Product,
   Promotion,
   Shipment,
+  ShippingOption,
   User,
 } from '~/types'
 
@@ -88,6 +91,7 @@ export const productsService = {
   onSale: () => api().api<Product[]>('/products/on-sale'),
   brands: () => api().api<string[]>('/products/brands'),
   bySlug: (slug: string) => api().api<Product>(`/products/slug/${slug}`),
+  byId: (id: string) => api().api<Product>(`/products/${id}`),
   related: (id: string, categoryId: string) =>
     api().api<Product[]>(`/products/${id}/related?categoryId=${categoryId}`),
   create: (data: Record<string, unknown>) =>
@@ -120,8 +124,8 @@ export const uploadsService = {
 export const cartService = {
   get: (sessionId?: string) =>
     api().api(`/cart${sessionId ? `?sessionId=${sessionId}` : ''}`),
-  addItem: (cartId: string, productId: string, quantity: number) =>
-    api().api('/cart/items', { method: 'POST', body: { cartId, productId, quantity } }),
+  addItem: (cartId: string, productId: string, quantity: number, variantId?: string | null) =>
+    api().api('/cart/items', { method: 'POST', body: { cartId, productId, quantity, variantId } }),
   updateItem: (itemId: string, cartId: string, quantity: number) =>
     api().api(`/cart/items/${itemId}`, { method: 'PATCH', body: { cartId, quantity } }),
   removeItem: (itemId: string, cartId: string) =>
@@ -194,21 +198,52 @@ export const shipmentsService = {
   all: () => api().api<Shipment[]>('/shipments'),
   advance: (id: string) => api().api<Shipment>(`/shipments/${id}/advance`, { method: 'POST' }),
   /**
-   * Cotiza el costo de envío en tiempo real usando Envia.com.
-   * Se llama desde el checkout al ingresar la dirección.
+   * Cotiza en tiempo real con Envia.com todas las opciones de envío para una
+   * dirección: cada carrier/servicio con su precio real y su tiempo estimado.
    */
-  quote: (params: { province: string; city?: string; postalCode: string; weightKg?: number }) =>
-    api().api<{
-      cost: number
-      currency?: string
-      carrierName?: string
-      serviceDescription?: string
-      deliveryEstimate?: string
-    }>(
-      `/shipments/quote?province=${encodeURIComponent(params.province)}${params.city ? `&city=${encodeURIComponent(params.city)}` : ''}&postalCode=${params.postalCode}${params.weightKg ? `&weightKg=${params.weightKg}` : ''}`,
-    ),
+  quote: (params: {
+    province: string
+    city?: string
+    postalCode: string
+    address?: string
+    number?: string
+    items: { productId: string; quantity: number }[]
+  }) =>
+    api().api<{ options: ShippingOption[]; cost: number; currency: string }>('/shipments/quote', {
+      method: 'POST',
+      body: params,
+    }),
+  /** Sucursales de un carrier cerca de una dirección (retiro en sucursal). */
+  branches: (params: { carrier: string; type?: 1 | 2 | 3; zipcode?: string; city?: string }) =>
+    api().api<BranchInfo[]>('/shipments/branches', { query: params as Record<string, unknown> }),
+  /** Datos del mapa de sucursales: origen de TOROX + sucursales cercanas (admin). */
+  mapData: (params: { carrier?: string; type?: 1 | 2 | 3; limit?: number; radiusKm?: number } = {}) =>
+    api().api<BranchesMapData>('/shipments/map', { query: params as Record<string, unknown> }),
+  /** Carriers disponibles en Argentina (admin). */
+  carriers: () => api().api<{ id: string; name: string; description?: string }[]>('/shipments/carriers'),
+  /** Define la sucursal de Envia donde se dejan los paquetes (origen de los envíos). */
+  setOriginBranch: (branch: BranchInfo) =>
+    api().api<BranchInfo>('/shipments/origin-branch', {
+      method: 'POST',
+      body: branch as unknown as Record<string, unknown>,
+    }),
+  /**
+   * Vuelve a usar la dirección del .env como origen de los envíos.
+   * Con `carrier` borra sólo el origen de esa paquetería.
+   */
+  clearOriginBranch: (carrier?: string) =>
+    api().api<{ cleared: boolean; carrier: string | null }>('/shipments/origin-branch', {
+      method: 'DELETE',
+      query: carrier ? { carrier } : undefined,
+    }),
   /** Obtiene la URL de la etiqueta PDF de Envia.com (admin). */
   label: (id: string) => api().api<{ url: string | null }>(`/shipments/${id}/label`),
+  /** Descarga la etiqueta PDF de Envia.com como archivo (admin). */
+  downloadLabel: (id: string) =>
+    api().api<Blob>(`/shipments/${id}/label/file`, { responseType: 'blob' }),
+  /** Genera (o reintenta) la guía en Envia.com para un pedido (admin). */
+  generateForOrder: (orderId: string) =>
+    api().api<Shipment>(`/shipments/order/${orderId}/generate`, { method: 'POST' }),
   /** Sincroniza el estado del envío con la API de Envia.com (admin). */
   sync: (id: string) => api().api<Shipment>(`/shipments/${id}/sync`, { method: 'POST' }),
 }

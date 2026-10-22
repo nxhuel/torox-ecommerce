@@ -41,6 +41,19 @@ export interface Category {
   productCount?: number
 }
 
+export interface ProductVariant {
+  id: string
+  productId: string
+  name: string
+  sku?: string | null
+  stock: number
+  images: string[]
+  isActive: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Product {
   id: string
   name: string
@@ -56,6 +69,11 @@ export interface Product {
   cost?: number | null
   stock: number
   images: string[]
+  /** Label of the variation axis, e.g. "Color". */
+  variantName?: string | null
+  variants?: ProductVariant[]
+  /** Active promotion applied to this product, if any. */
+  promotion?: ProductPromotion | null
   specifications?: Record<string, string> | null
   highlights?: string[] | null
   specGroups?: SpecGroup[] | null
@@ -90,6 +108,7 @@ export interface CartItem {
   id: string
   cartId: string
   productId: string
+  variantId?: string | null
   quantity: number
   unitPrice: number
   productSnapshot?: {
@@ -98,6 +117,8 @@ export interface CartItem {
     brand?: string
     slug?: string
     stock?: number
+    variantId?: string | null
+    variantName?: string | null
   } | null
   createdAt: string
 }
@@ -133,6 +154,8 @@ export type ShipmentStatus =
 export interface OrderItem {
   id: string
   productId: string
+  variantId?: string | null
+  variantName?: string | null
   name: string
   sku: string
   image?: string | null
@@ -173,9 +196,98 @@ export interface Shipment {
   enviaId?: string | null
   labelUrl?: string | null
   trackUrl?: string | null
+  service?: string | null
+  dropOff?: number | null
+  branchCode?: string | null
+  branchAddress?: string | null
+  originAddress?: string | null
+  originBranchCode?: string | null
+  declaredValue?: number | null
+  packageInfo?: Record<string, number> | null
   shippedAt?: string | null
   deliveredAt?: string | null
   createdAt: string
+}
+
+/* ---------- Envíos (Envia.com) ---------- */
+
+/** Sucursal (centro de admisión / punto de retiro) de un carrier. */
+export interface BranchInfo {
+  branchCode: string
+  branchId?: string
+  carrier: string
+  carrierName?: string
+  reference?: string
+  type: 'ORIGIN' | 'DESTINATION' | 'BOTH'
+  address: {
+    street?: string
+    number?: string
+    city?: string
+    state?: string
+    postalCode?: string
+    country?: string
+    latitude?: number
+    longitude?: number
+  }
+  distanceKm?: number
+  phone?: string
+  hours?: unknown
+}
+
+/** Una opción de envío cotizada en Envia.com (carrier + servicio + modalidad). */
+export interface ShippingOption {
+  id: string
+  carrier: string
+  carrierId?: string
+  carrierName: string
+  service: string
+  serviceDescription?: string
+  /** 0 = puerta a puerta, 1 = puerta a sucursal, 2 = sucursal a puerta, 3 = sucursal a sucursal. */
+  dropOff: number
+  dropOffDescription?: string
+  deliveryMode: 'HOME' | 'BRANCH'
+  pickupMode: 'DOOR' | 'BRANCH'
+  cost: number
+  currency: string
+  deliveryEstimate?: string
+  deliveryDate?: string
+  branches: BranchInfo[]
+}
+
+/** Opción elegida por el comprador (snapshot guardado en la orden). */
+export interface ShippingOptionSnapshot extends Omit<ShippingOption, 'branches'> {}
+
+/** Datos del mapa de sucursales (admin). */
+export interface BranchesMapData {
+  origin: {
+    name: string
+    company?: string
+    email?: string
+    phone?: string
+    street: string
+    number?: string
+    city: string
+    state: string
+    country: string
+    postalCode: string
+    latitude?: number | null
+    longitude?: number | null
+    geocodeSource?: string | null
+  }
+  /** Sucursal de origen configurada para cada paquetería. */
+  originBranches: BranchInfo[]
+  branches: BranchInfo[]
+  /** Total de sucursales que devolvió Envia (antes de filtrar por cercanía). */
+  totalBranches?: number
+  /** Radio de búsqueda en km. */
+  radiusKm?: number
+  carriers: { id: string; name: string; description?: string }[]
+  configuredCarriers: string[]
+  environment: {
+    apiBase: string
+    queriesBase: string
+    isSandbox: boolean
+  }
 }
 
 export interface Order {
@@ -194,7 +306,23 @@ export interface Order {
     apartment?: string
     references?: string
   }
-  shippingMethod: 'HOME_DELIVERY' | 'PICKUP'
+  shippingMethod: 'HOME_DELIVERY' | 'BRANCH_PICKUP' | 'PICKUP'
+  shippingOption?: ShippingOptionSnapshot | null
+  shippingBranch?: BranchInfo | null
+  /** Origen congelado del envío (sucursal o dirección de salida del paquete). */
+  shippingOrigin?: {
+    carrier: string
+    branchCode: string | null
+    reference?: string | null
+    address?: {
+      name?: string
+      street?: string
+      number?: string
+      city?: string
+      state?: string
+      postalCode?: string
+    }
+  } | null
   subtotal: number
   discount: number
   shippingCost: number
@@ -252,6 +380,16 @@ export interface Promotion {
   createdAt: string
   updatedAt: string
   isCurrentlyActive?: boolean
+}
+
+/** Promotion summary embedded in a product response. */
+export interface ProductPromotion {
+  id: string
+  name: string
+  type: PromotionType
+  value: number
+  startDate: string
+  endDate: string
 }
 
 export interface FinanceMovement {

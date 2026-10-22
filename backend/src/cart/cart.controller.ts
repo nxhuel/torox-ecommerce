@@ -16,9 +16,9 @@ export class CartController {
 
   @Post('items')
   addItem(
-    @Body() body: { cartId: string; productId: string; quantity: number },
+    @Body() body: { cartId: string; productId: string; quantity: number; variantId?: string | null },
   ) {
-    return this.service.addItem(body.cartId, body.productId, body.quantity);
+    return this.service.addItem(body.cartId, body.productId, body.quantity, body.variantId);
   }
 
   @Patch('items/:itemId')

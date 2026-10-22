@@ -23,7 +23,7 @@ async function bootstrap() {
 
     // Enable CORS - accept the configured frontend origin(s) plus any *.seenode.app origin.
     // FRONTEND_URL accepts a comma-separated list, e.g. "https://torox.com.ar,https://www.torox.com.ar".
-    const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3001')
+    const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
       .split(',')
       .map((value) => value.trim().replace(/\/+$/, ''))
       .filter(Boolean);

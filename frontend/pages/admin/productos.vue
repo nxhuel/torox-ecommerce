@@ -34,6 +34,8 @@ const form = reactive({
   stock: 0,
   description: '',
   images: [] as string[],
+  variantName: 'Color',
+  variants: [] as VariantForm[],
   highlights: ['', ''] as string[],
   isFeatured: false,
   isOnSale: false,
@@ -43,6 +45,21 @@ const form = reactive({
   heightCm: null as number | null,
   lengthCm: null as number | null,
 })
+
+interface VariantForm {
+  id?: string
+  name: string
+  stock: number
+  images: string[]
+  isActive: boolean
+}
+
+const variantUploading = ref<number | null>(null)
+
+/** Product stock is the sum of its variants once it has any. */
+const totalVariantStock = computed(() =>
+  form.variants.reduce((sum, variant) => sum + (Number(variant.stock) || 0), 0),
+)
 
 // Descuento real ingresado (se conserva con decimales, sin redondear).
 // Se limita a 6 decimales, la misma precisión que guarda el backend.
@@ -100,6 +117,8 @@ function openCreate() {
     stock: 0,
     description: '',
     images: [],
+    variantName: 'Color',
+    variants: [],
     highlights: ['', ''],
     isFeatured: false,
     isOnSale: false,
@@ -113,29 +132,67 @@ function openCreate() {
   showModal.value = true
 }
 
-function openEdit(product: Product) {
-  editing.value = product
-  Object.assign(form, {
-    name: product.name,
-    brand: product.brand || '',
-    categoryId: product.categoryId,
-    price: Number(product.price),
-    discountPercentage: product.discountPercentage != null ? Number(product.discountPercentage) : null,
-    cost: product.cost != null ? Number(product.cost) : null,
-    stock: product.stock,
-    description: product.description || '',
-    images: [...(product.images || [])],
-    highlights: [...(product.highlights || [])].slice(0, 2),
-    isFeatured: product.isFeatured,
-    isOnSale: product.isOnSale,
-    isActive: product.isActive,
-    weightKg: product.weightKg != null ? Number(product.weightKg) : null,
-    widthCm: product.widthCm != null ? Number(product.widthCm) : null,
-    heightCm: product.heightCm != null ? Number(product.heightCm) : null,
-    lengthCm: product.lengthCm != null ? Number(product.lengthCm) : null,
-  })
-  while (form.highlights.length < 2) form.highlights.push('')
-  showModal.value = true
+async function openEdit(product: Product) {
+  try {
+    // The list payload doesn't include variants: fetch the full product.
+    const full = await productsService.byId(product.id)
+    editing.value = full
+    Object.assign(form, {
+      name: full.name,
+      brand: full.brand || '',
+      categoryId: full.categoryId,
+      price: Number(full.price),
+      discountPercentage: full.discountPercentage != null ? Number(full.discountPercentage) : null,
+      cost: full.cost != null ? Number(full.cost) : null,
+      stock: full.stock,
+      description: full.description || '',
+      images: [...(full.images || [])],
+      variantName: full.variantName || 'Color',
+      variants: (full.variants || []).map((variant) => ({
+        id: variant.id,
+        name: variant.name,
+        stock: variant.stock,
+        images: [...(variant.images || [])],
+        isActive: variant.isActive,
+      })),
+      highlights: [...(full.highlights || [])].slice(0, 2),
+      isFeatured: full.isFeatured,
+      isOnSale: full.isOnSale,
+      isActive: full.isActive,
+      weightKg: full.weightKg != null ? Number(full.weightKg) : null,
+      widthCm: full.widthCm != null ? Number(full.widthCm) : null,
+      heightCm: full.heightCm != null ? Number(full.heightCm) : null,
+      lengthCm: full.lengthCm != null ? Number(full.lengthCm) : null,
+    })
+    while (form.highlights.length < 2) form.highlights.push('')
+    showModal.value = true
+  } catch (error: any) {
+    toast.error(error.message)
+  }
+}
+
+function addVariant() {
+  form.variants.push({ name: '', stock: 0, images: [], isActive: true })
+}
+
+function removeVariant(index: number) {
+  form.variants.splice(index, 1)
+}
+
+async function uploadVariantImages(index: number, event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || []).filter((file) => file.type.startsWith('image/'))
+  input.value = ''
+  if (!files.length) return
+  variantUploading.value = index
+  try {
+    const urls = await uploadsService.images(files)
+    form.variants[index].images.push(...urls)
+  } catch (error: any) {
+    toast.error(error.message || 'No se pudieron subir las imágenes')
+  } finally {
+    variantUploading.value = null
+  }
 }
 
 function removeImage(index: number) {
@@ -214,6 +271,18 @@ async function save() {
     toast.error('Completá nombre, categoría y precio')
     return
   }
+  const hasVariants = form.variants.length > 0
+  if (hasVariants) {
+    if (form.variants.some((variant) => !variant.name.trim())) {
+      toast.error('Completá el nombre de cada variante')
+      return
+    }
+    const names = form.variants.map((variant) => variant.name.trim().toLowerCase())
+    if (new Set(names).size !== names.length) {
+      toast.error('No puede haber dos variantes con el mismo nombre')
+      return
+    }
+  }
   saving.value = true
   const highlights = form.highlights.map((h) => h.trim()).filter(Boolean).slice(0, 2)
 
@@ -227,9 +296,21 @@ async function save() {
     price: Number(form.price),
     discountPercentage: discountPercentageValue,
     cost: form.cost != null ? Number(form.cost) : undefined,
-    stock: Number(form.stock),
+    // With variants the stock is the sum of theirs (the backend also enforces it).
+    stock: hasVariants ? totalVariantStock.value : Number(form.stock),
     description: form.description || undefined,
     images: form.images.length ? form.images : undefined,
+    variantName: hasVariants ? form.variantName.trim() || 'Color' : null,
+    variants: hasVariants
+      ? form.variants.map((variant, index) => ({
+          id: variant.id,
+          name: variant.name.trim(),
+          stock: Number(variant.stock) || 0,
+          images: variant.images,
+          isActive: variant.isActive,
+          sortOrder: index,
+        }))
+      : [],
     highlights: highlights.length ? highlights : undefined,
     isFeatured: form.isFeatured,
     isOnSale: (discountPercentageValue != null && discountPercentageValue > 0) || form.isOnSale,
@@ -419,7 +500,17 @@ function categoryName(id: string) {
         </div>
         <div>
           <label class="label-base">Stock</label>
-          <input v-model.number="form.stock" type="number" min="0" class="input-base" />
+          <input
+            v-model.number="form.stock"
+            type="number"
+            min="0"
+            class="input-base"
+            :disabled="form.variants.length > 0"
+            :class="form.variants.length > 0 ? 'cursor-not-allowed bg-slate-50 text-slate-500' : ''"
+          />
+          <p v-if="form.variants.length > 0" class="mt-1 text-xs text-brand-600">
+            Se calcula sumando el stock de las variantes: {{ totalVariantStock }}
+          </p>
         </div>
         <div class="sm:col-span-2">
           <label class="label-base">Foto/s</label>
@@ -459,6 +550,87 @@ function categoryName(id: string) {
             </div>
           </div>
           <p v-if="form.images.length" class="mt-1 text-xs text-slate-400">La primera imagen es la principal.</p>
+        </div>
+        <div class="sm:col-span-2 rounded-xl border border-slate-200 p-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <label class="label-base">Variantes</label>
+              <p class="text-xs text-slate-400">
+                Mismo producto en distintas opciones (ej: colores). Cada variante tiene su stock y sus imágenes.
+              </p>
+            </div>
+            <button type="button" class="btn-secondary !py-2 !text-xs" @click="addVariant">
+              <Plus class="h-3.5 w-3.5" /> Agregar variante
+            </button>
+          </div>
+
+          <p v-if="!form.variants.length" class="mt-3 rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
+            Sin variantes: el producto se vende como uno solo.
+          </p>
+
+          <template v-else>
+            <div class="mt-4">
+              <label class="label-base">Nombre de la opción</label>
+              <input v-model="form.variantName" class="input-base" placeholder="Color" />
+              <p class="mt-1 text-xs text-slate-400">
+                Es el título que ve el cliente sobre las opciones (Color, Talle, Modelo...).
+              </p>
+            </div>
+
+            <div class="mt-3 space-y-3">
+              <div
+                v-for="(variant, index) in form.variants"
+                :key="variant.id || `new-${index}`"
+                class="rounded-xl border border-slate-200 p-3"
+              >
+                <div class="grid gap-3 sm:grid-cols-[1fr_110px_auto] sm:items-end">
+                  <div>
+                    <label class="label-base">Valor</label>
+                    <input v-model="variant.name" class="input-base" placeholder="Negro" />
+                  </div>
+                  <div>
+                    <label class="label-base">Stock</label>
+                    <input v-model.number="variant.stock" type="number" min="0" class="input-base" />
+                  </div>
+                  <button
+                    type="button"
+                    class="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                    aria-label="Quitar variante"
+                    @click="removeVariant(index)"
+                  >
+                    <Trash2 class="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                  <div v-for="(image, imageIndex) in variant.images" :key="image" class="relative">
+                    <AppImage :src="image" :alt="variant.name" class="h-14 w-14 rounded-lg border border-slate-200" />
+                    <button
+                      type="button"
+                      class="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white"
+                      aria-label="Quitar imagen"
+                      @click="variant.images.splice(imageIndex, 1)"
+                    >
+                      <Trash2 class="h-3 w-3" />
+                    </button>
+                  </div>
+                  <label
+                    class="flex h-14 w-14 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-slate-400 transition hover:border-brand-400 hover:text-brand-600"
+                  >
+                    <LoaderCircle v-if="variantUploading === index" class="h-5 w-5 animate-spin" />
+                    <ImagePlus v-else class="h-5 w-5" />
+                    <input type="file" accept="image/*" multiple class="hidden" @change="uploadVariantImages(index, $event)" />
+                  </label>
+                </div>
+                <p class="mt-1 text-xs text-slate-400">Si no cargás imágenes, se usan las del producto.</p>
+
+                <label class="mt-2 flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-600">
+                  <input v-model="variant.isActive" type="checkbox" class="h-3.5 w-3.5 rounded border-slate-300 text-brand-600" />
+                  Disponible para la venta
+                </label>
+              </div>
+            </div>
+          </template>
         </div>
         <div class="sm:col-span-2 rounded-xl border border-slate-200 p-4">
           <label class="label-base">Lo que tenés que saber de este producto (2 puntos principales)</label>
