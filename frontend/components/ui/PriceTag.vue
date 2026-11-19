@@ -10,8 +10,10 @@ const props = withDefaults(
     /** Real discount percentage, rendered as-is (e.g. 21,95% OFF). */
     discountPercentage?: number | null
     size?: 'sm' | 'md' | 'lg'
+    /** Oculta la etiqueta "% OFF" (cuando la tarjeta ya la muestra sobre la foto). */
+    hideBadge?: boolean
   }>(),
-  { originalPrice: null, discountPercentage: null, size: 'md' },
+  { originalPrice: null, discountPercentage: null, size: 'md', hideBadge: false },
 )
 
 const { currency, percentage } = useFormat()
@@ -43,7 +45,7 @@ const discountLabel = computed(() => {
 
 <template>
   <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-    <span class="font-extrabold text-slate-900" :class="sizeClasses.price">
+    <span class="font-display tabular-nums text-slate-900" :class="sizeClasses.price">
       {{ currency(price) }}
     </span>
     <span
@@ -54,8 +56,8 @@ const discountLabel = computed(() => {
       {{ currency(originalPrice) }}
     </span>
     <span
-      v-if="discountLabel"
-      class="rounded bg-green-50 px-1.5 py-0.5 text-xs font-bold text-green-600"
+      v-if="discountLabel && !hideBadge"
+      class="rounded bg-signal px-1.5 py-0.5 text-xs font-bold text-dark-900"
     >
       {{ discountLabel }}
     </span>

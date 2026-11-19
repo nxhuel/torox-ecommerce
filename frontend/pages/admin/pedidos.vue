@@ -11,6 +11,8 @@ import {
   ChevronRight,
   Printer,
   Download,
+  RefreshCw,
+  Ban,
 } from 'lucide-vue-next'
 import type { Order } from '~/types'
 import { ordersService, shipmentsService } from '~/services'
@@ -119,6 +121,23 @@ const generateLabel = () =>
     () => shipmentsService.generateForOrder(selected.value!.id),
     'Guía generada en Envia.com',
   )
+
+/** Consulta el estado real del envío en Envia (por si no llegó el webhook). */
+const syncShipment = () =>
+  selected.value?.shipment &&
+  runAction(() => shipmentsService.sync(selected.value!.shipment!.id), 'Estado actualizado desde Envia')
+
+/** Anula la guía en Envia (reintegro de la etiqueta) para poder regenerarla. */
+function cancelShipment() {
+  const shipment = selected.value?.shipment
+  if (!shipment) return
+  const ok = window.confirm(
+    `¿Anular la guía ${shipment.trackingNumber}?\n\nEnvia pide el reintegro del costo al correo. ` +
+      'Sólo funciona si el paquete todavía no fue despachado. Después vas a poder generar una guía nueva.',
+  )
+  if (!ok) return
+  runAction(() => shipmentsService.cancel(shipment.id), 'Guía anulada en Envia')
+}
 
 /** Abre el PDF de la etiqueta en una pestaña nueva. */
 async function printLabel() {
@@ -427,19 +446,50 @@ const canDeliver = computed(() => selected.value?.status === 'SHIPPED')
                     <Truck class="h-3.5 w-3.5" />
                     Avanzar a {{ SHIPMENT_STATUS_LABELS[nextShipment] }}
                   </button>
+                  <button
+                    class="btn-secondary !py-1.5 !text-xs"
+                    :disabled="actionLoading"
+                    title="Consulta el estado real en Envia por si no llegó el aviso automático"
+                    @click="syncShipment"
+                  >
+                    <RefreshCw class="h-3.5 w-3.5" />
+                    Actualizar desde Envia
+                  </button>
+                  <button
+                    v-if="selected.shipment.status === 'PREPARING'"
+                    class="btn-secondary !py-1.5 !text-xs !text-red-600"
+                    :disabled="actionLoading"
+                    @click="cancelShipment"
+                  >
+                    <Ban class="h-3.5 w-3.5" />
+                    Anular guía
+                  </button>
                 </div>
+                <ol v-if="selected.shipment.events?.length" class="mt-3 space-y-1.5 border-t border-slate-100 pt-3">
+                  <li
+                    v-for="(event, idx) in [...selected.shipment.events].reverse()"
+                    :key="idx"
+                    class="flex gap-2 text-xs"
+                    :class="event.description?.startsWith('Novedad del correo') ? 'text-amber-700' : 'text-slate-500'"
+                  >
+                    <span class="shrink-0 font-mono text-slate-400">{{ dateTime(event.date) }}</span>
+                    <span>{{ event.description }}</span>
+                  </li>
+                </ol>
               </div>
               <div v-else class="rounded-lg border border-dashed border-slate-200 p-3">
                 <p class="text-sm text-slate-400">Envío aún no generado</p>
-                <button
-                  v-if="selected.shippingMethod !== 'PICKUP'"
-                  class="btn-secondary mt-2 !py-1.5 !text-xs"
-                  :disabled="actionLoading"
-                  @click="generateLabel"
-                >
-                  <Package class="h-3.5 w-3.5" />
-                  Generar guía en Envia.com
-                </button>
+                <p v-if="selected.shippingOption" class="mt-1 text-sm text-slate-600">
+                  Correo elegido: <strong>{{ selected.shippingOption.carrierName }}</strong>
+                  · {{ selected.shippingOption.serviceDescription || selected.shippingOption.service }}
+                </p>
+                <div v-if="selected.shippingMethod !== 'PICKUP'" class="mt-2 flex flex-wrap gap-2">
+                  <button class="btn-secondary !py-1.5 !text-xs" :disabled="actionLoading" @click="generateLabel">
+                    <Package class="h-3.5 w-3.5" />
+                    Generar guía en Envia.com
+                  </button>
+                </div>
+
               </div>
             </div>
 

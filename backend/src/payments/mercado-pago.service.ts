@@ -27,7 +27,7 @@ export interface MercadoPagoPreference {
     failure: string;
     pending: string;
   };
-  auto_return: 'approved' | 'authorized';
+  auto_return?: 'approved' | 'authorized';
   items: Array<{
     id: string;
     title: string;
@@ -37,7 +37,7 @@ export interface MercadoPagoPreference {
     quantity: number;
     picture_url?: string;
   }>;
-  notification_url: string;
+  notification_url?: string;
   external_reference: string;
   marketplace_owner: boolean;
 }
@@ -124,7 +124,9 @@ export class MercadoPagoService implements PaymentProvider {
         failure: failureUrl,
         pending: pendingUrl,
       },
-      auto_return: 'approved',
+      // Mercado Pago sólo acepta auto_return con URLs públicas (https). En local
+      // (http://localhost) se omite: el comprador vuelve con "Volver al sitio".
+      ...(successUrl.startsWith('https://') ? { auto_return: 'approved' as const } : {}),
       items: items.map((item) => ({
         id: item.id,
         title: item.name,
@@ -134,7 +136,11 @@ export class MercadoPagoService implements PaymentProvider {
         quantity: item.quantity,
         ...(item.image && { picture_url: item.image }),
       })),
-      notification_url: this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL') || '',
+      // Sólo se manda si está configurada: en local se deja vacía porque MP no
+      // puede llegar a localhost (el pago se confirma al volver, ver /confirm).
+      ...(this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL')
+        ? { notification_url: this.config.get<string>('MERCADO_PAGO_WEBHOOK_URL') as string }
+        : {}),
       external_reference: orderId,
       marketplace_owner: true,
     };
@@ -191,7 +197,9 @@ export class MercadoPagoService implements PaymentProvider {
       }),
     );
 
-    return response.data.body.results || [];
+    // La API devuelve { results } (algunos wrappers lo envuelven en { body }).
+    const data = response.data?.body ?? response.data;
+    return data?.results ?? [];
   }
 
   /**

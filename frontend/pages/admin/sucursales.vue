@@ -399,10 +399,17 @@ function branchAddress(branch: BranchInfo): string {
       <div class="min-w-[200px] flex-1">
         <label class="label-base" for="carrierFilter">Paquetería</label>
         <select id="carrierFilter" v-model="carrierFilter" class="input-base" @change="load">
-          <option value="">Todas las configuradas</option>
-          <option v-for="carrier in data?.carriers ?? []" :key="carrier.id" :value="carrier.name">
-            {{ carrier.description || carrier.name }}
-          </option>
+          <!-- TOROX trabaja sólo con Correo Argentino: si hay un único correo
+               habilitado se muestra sólo ese, sin la opción "Todas". -->
+          <template v-if="(data?.carriers?.length ?? 0) === 1">
+            <option value="">{{ data!.carriers[0].description || data!.carriers[0].name }}</option>
+          </template>
+          <template v-else>
+            <option value="">Todas las configuradas</option>
+            <option v-for="carrier in data?.carriers ?? []" :key="carrier.id" :value="carrier.name">
+              {{ carrier.description || carrier.name }}
+            </option>
+          </template>
         </select>
       </div>
       <div class="min-w-[200px] flex-1">

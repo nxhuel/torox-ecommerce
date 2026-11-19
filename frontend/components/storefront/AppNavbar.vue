@@ -4,7 +4,6 @@ import {
   ShoppingCart,
   Heart,
   Bell,
-  MapPin,
   Menu,
   X,
   Shield,
@@ -19,7 +18,8 @@ import {
 import { useAuthStore } from '~/stores/auth'
 import { useCartStore } from '~/stores/cart'
 import { useNotificationsStore } from '~/stores/notifications'
-import { productsService } from '~/services'
+import { productsService, categoriesService } from '~/services'
+import type { Category } from '~/types'
 import logo from '~/assets/logo.png'
 import { useTheme } from '~/composables/useTheme'
 import { useFormat } from '~/composables/useFormat'
@@ -37,7 +37,7 @@ const mobileOpen = ref(false)
 const accountOpen = ref(false)
 const notifOpen = ref(false)
 const notifMenuRef = ref<HTMLElement | null>(null)
-const location = ref('Buenos Aires')
+const navCategories = ref<Category[]>([])
 
 // Autocomplete
 const searchResults = ref<any[]>([])
@@ -50,6 +50,15 @@ onMounted(() => {
   cart.init()
   if (auth.isAuthenticated) notifications.load()
   document.addEventListener('click', onClickOutside)
+  categoriesService
+    .all(true)
+    .then((all) => {
+      navCategories.value = all
+        .filter((c) => !c.parentId && c.isActive)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .slice(0, 6)
+    })
+    .catch(() => {})
 })
 
 function onClickOutside(event: MouseEvent) {
@@ -101,7 +110,7 @@ function goToProduct(slug: string) {
   searchOpen.value = false
   searchQuery.value = ''
   searchResults.value = []
-  router.push(`/productos/${slug}`)
+  router.push(`/especificacion/${slug}`)
 }
 
 function submitSearch() {
@@ -130,10 +139,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 bg-white shadow-sm">
+  <header class="nav-glass sticky top-0 z-50">
     <!-- First row -->
-    <div class="border-b border-slate-100">
-      <div class="container-torox flex h-20 items-center gap-4">
+    <div class="border-b border-slate-900/[0.07] dark:border-white/[0.07]">
+      <div class="container-torox flex h-16 items-center gap-4 sm:h-[4.5rem]">
         <!-- Mobile hamburger -->
         <button
           class="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
@@ -146,10 +155,8 @@ onUnmounted(() => {
 
         <!-- Logo -->
         <NuxtLink to="/" class="flex shrink-0 items-center gap-2 sm:gap-3">
-          <img :src="logo" alt="TOROX" class="h-10 w-auto object-contain drop-shadow-[0_2px_8px_rgba(2,116,197,0.4)] sm:h-16" />
-          <span class="text-xl font-black tracking-tight text-dark-800 sm:text-3xl">
-            TOROX<span class="text-brand-600">.</span>
-          </span>
+          <img :src="logo" alt="" class="h-9 w-auto object-contain sm:h-11" />
+          <span class="font-display text-[1.45rem] tracking-[-0.02em] text-slate-900 sm:text-[1.75rem]">TOROX</span>
         </NuxtLink>
 
         <!-- Search -->
@@ -166,7 +173,7 @@ onUnmounted(() => {
             />
             <button
               type="submit"
-              class="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-brand-600 text-white transition hover:bg-brand-700"
+              class="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-torox text-white transition hover:bg-torox-deep"
               aria-label="Buscar"
             >
               <Search class="h-4 w-4" />
@@ -228,7 +235,7 @@ onUnmounted(() => {
             </NuxtLink>
             <NuxtLink
               to="/auth/login"
-              class="hidden rounded-lg border border-brand-600 px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 md:block"
+              class="btn-primary !hidden !rounded-full !px-5 !py-2 md:!inline-flex"
             >
               Ingresá
             </NuxtLink>
@@ -362,7 +369,7 @@ onUnmounted(() => {
             <ShoppingCart class="h-5 w-5" />
             <span
               v-if="cart.count > 0"
-              class="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-bold text-white"
+              class="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-torox px-1 text-[10px] font-bold text-white"
             >
               {{ cart.count }}
             </span>
@@ -425,24 +432,23 @@ onUnmounted(() => {
         </div>
       </form>
     </div>      <!-- Second row -->
-    <div class="hidden border-b border-slate-100 bg-slate-50/60 lg:block overflow-x-hidden">
+    <div class="hidden border-b border-slate-900/[0.07] dark:border-white/[0.07] lg:block overflow-x-hidden">
       <div class="container-torox flex w-full max-w-7xl mx-auto h-11 items-center justify-between text-sm overflow-x-hidden">
-        <nav class="flex items-center gap-1">
-          <NuxtLink to="/productos" class="rounded-lg px-3 py-1.5 font-medium text-slate-700 transition hover:bg-slate-100 hover:text-brand-700">
-            Productos
+        <nav class="no-scrollbar flex items-center gap-1 overflow-x-auto">
+          <NuxtLink to="/productos" class="rounded-lg px-3 py-1.5 font-semibold text-slate-900 transition hover:bg-slate-100">
+            Todos los productos
           </NuxtLink>
-
-          <NuxtLink to="/faq" class="rounded-lg px-3 py-1.5 font-medium text-slate-700 transition hover:bg-slate-100 hover:text-brand-700">
-            Preguntas frecuentes
+          <NuxtLink
+            v-for="category in navCategories"
+            :key="category.id"
+            :to="`/productos?categoryId=${category.id}`"
+            class="whitespace-nowrap rounded-lg px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+          >
+            {{ category.name }}
           </NuxtLink>
         </nav>
-        <NuxtLink
-          to="/cuenta/direcciones"
-          class="ml-10 flex items-center gap-2 rounded-lg px-2 py-1.5 text-slate-700 transition hover:bg-slate-100"
-        >
-          <MapPin class="h-4 w-4 text-brand-600" />
-          <span class="font-medium">Enviar a</span>
-          <span class="text-slate-500">{{ location }}</span>
+        <NuxtLink to="/faq" class="ml-6 shrink-0 rounded-lg px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900">
+          Preguntas frecuentes
         </NuxtLink>
       </div>
     </div>

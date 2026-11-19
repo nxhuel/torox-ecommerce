@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ChevronDown, HelpCircle } from 'lucide-vue-next'
+import { ChevronDown } from 'lucide-vue-next'
+import { STORE } from '~/utils/store'
 
 const faqs = [
   {
@@ -11,6 +12,16 @@ const faqs = [
     question: '¿Cómo funcionan los envíos?',
     answer:
       'Despachamos tu pedido en 24 hs hábiles a todo el país. Una vez despachado, recibís un número de seguimiento para monitorear el envío en tiempo real desde tu cuenta. El costo del envío corre por cuenta del comprador y los plazos varían según tu ubicación.',
+  },
+  {
+    question: '¿Puedo consultar antes de comprar?',
+    answer:
+      `Sí. Escribinos por WhatsApp al ${STORE.whatsappDisplay} y te ayudamos a elegir el producto según tu casa o negocio. Te respondemos personas, no un bot.`,
+  },
+  {
+    question: '¿Cómo sigo mi pedido?',
+    answer:
+      'Cuando despachamos tu compra te llega un mail con el número de seguimiento. También lo ves en Mi cuenta → Mis compras, con cada movimiento del correo.',
   },
   {
     question: '¿Qué medios de pago aceptan?',
@@ -27,30 +38,29 @@ function toggle(index: number) {
 </script>
 
 <template>
-  <div>
-    <div class="mx-auto mb-10 max-w-2xl text-center">
-      <span class="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-brand-600 underline">
-        <!-- <HelpCircle class="h-4 w-4" /> -->
-        Preguntas frecuentes
-      </span>
-      <h2 class="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">Todo lo que necesitás saber</h2>
-      <p class="mt-2 text-slate-500">Resolvé tus dudas sobre calidad, envíos, pagos y más</p>
+  <div class="grid gap-8 lg:grid-cols-[1fr_1.8fr] lg:gap-16">
+    <div>
+      <h2 class="font-display text-4xl text-slate-900 sm:text-5xl">Preguntas <span class="text-gradient-torox">frecuentes</span></h2>
+      <p class="mt-3 text-slate-500">
+        ¿No encontrás tu respuesta?
+        <a :href="`https://wa.me/${STORE.whatsapp}`" target="_blank" rel="noopener noreferrer" class="font-semibold text-torox underline underline-offset-4 dark:text-torox-sky">Escribinos por WhatsApp</a>.
+      </p>
     </div>
 
-    <div class="mx-auto max-w-3xl space-y-3">
+    <div class="border-b border-slate-200">
       <div
         v-for="(faq, index) in faqs"
         :key="faq.question"
-        class="overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-brand-200"
+        class="border-t border-slate-200"
       >
         <button
-          class="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+          class="flex w-full items-center justify-between gap-4 py-5 text-left"
           :aria-expanded="openIndex === index"
           @click="toggle(index)"
         >
-          <span class="text-sm font-bold text-slate-900 sm:text-base">{{ faq.question }}</span>
+          <span class="text-base font-semibold text-slate-900 sm:text-lg">{{ faq.question }}</span>
           <ChevronDown
-            class="h-5 w-5 shrink-0 text-brand-600 transition-transform duration-200"
+            class="h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200"
             :class="openIndex === index ? 'rotate-180' : ''"
           />
         </button>
@@ -62,8 +72,8 @@ function toggle(index: number) {
           leave-from-class="opacity-100 translate-y-0"
           leave-to-class="opacity-0 -translate-y-1"
         >
-          <div v-if="openIndex === index" class="px-5 pb-5">
-            <p class="text-sm leading-relaxed text-slate-600">{{ faq.answer }}</p>
+          <div v-if="openIndex === index" class="pb-6 pr-10">
+            <p class="max-w-prose leading-relaxed text-slate-600">{{ faq.answer }}</p>
           </div>
         </Transition>
       </div>

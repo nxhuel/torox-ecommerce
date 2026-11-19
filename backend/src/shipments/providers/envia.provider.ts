@@ -69,7 +69,8 @@ function normalizeCity(city?: string): string {
 }
 
 /** Carriers que se cotizan por defecto en Argentina (se puede override con ENVIA_CARRIERS). */
-const DEFAULT_CARRIERS = ['correoArgentino', 'andreani', 'oca'];
+/** TOROX trabaja sólo con Correo Argentino (se puede cambiar con ENVIA_CARRIERS). */
+const DEFAULT_CARRIERS = ['correoArgentino'];
 
 // ─── Mapeo estado Envia → ShipmentStatus ────────────────────────────────────
 const ENVIA_STATUS_MAP: Record<string, ShipmentStatus> = {
@@ -89,6 +90,30 @@ const ENVIA_STATUS_MAP: Record<string, ShipmentStatus> = {
   'on the way': ShipmentStatus.OUT_FOR_DELIVERY,
   delivered: ShipmentStatus.DELIVERED,
 };
+
+/** Nombres comerciales: Envia a veces devuelve el slug ("andreani", "dpd"). */
+const CARRIER_NAMES: Record<string, string> = {
+  andreani: 'Andreani',
+  correoargentino: 'Correo Argentino',
+  oca: 'OCA',
+  dpd: 'DPD',
+  dhl: 'DHL',
+  fedex: 'FedEx',
+  urbano: 'Urbano',
+  paquery: 'Paquery',
+  rapiboy: 'Rapiboy',
+  treggo: 'Treggo',
+  welivery: 'Welivery',
+  flash: 'Flash',
+  rueddo: 'Rueddo',
+};
+function prettyCarrierName(name: string): string {
+  return CARRIER_NAMES[(name ?? '').toLowerCase().replace(/\s+/g, '')] ?? name;
+}
+
+/** Timeouts de la API de Envia: una cotización colgada no debe trabar el checkout. */
+const RATE_TIMEOUT_MS = 15_000;
+const GENERATE_TIMEOUT_MS = 30_000;
 
 const STATUS_FLOW: ShipmentStatus[] = [
   ShipmentStatus.PREPARING,
@@ -179,7 +204,20 @@ export class EnviaProvider implements ShipmentProvider {
   constructor(
     private readonly config: ConfigService,
     private readonly http: HttpService,
-  ) {}
+  ) {
+    // Aviso explícito de contra qué cuenta de Envia se está operando: en
+    // desarrollo con la cuenta de PRODUCCIÓN cada pago aprobado genera una
+    // etiqueta real que se descuenta del saldo.
+    const env = this.isSandbox ? 'SANDBOX (pruebas)' : 'PRODUCCIÓN';
+    const nodeEnv = this.config.get<string>('NODE_ENV') ?? 'development';
+    if (!this.isSandbox && nodeEnv !== 'production') {
+      this.logger.warn(
+        `Envia.com en ${env} con NODE_ENV=${nodeEnv}: las guías que se generen son REALES y se cobran. Para probar usá api-test.envia.com con un token de sandbox.`,
+      );
+    } else {
+      this.logger.log(`Envia.com: operando en ${env} (${this.apiBase}).`);
+    }
+  }
 
   // ─── Configuración ──────────────────────────────────────────────────────────
 
@@ -227,7 +265,10 @@ export class EnviaProvider implements ShipmentProvider {
    */
   getCarrierSlugs(): string[] | undefined {
     const raw = (this.config.get<string>('ENVIA_CARRIERS') ?? '').trim();
-    if (!raw || raw.toLowerCase() === 'all') return undefined;
+    // Sin configurar → sólo los correos por defecto (Correo Argentino).
+    // "all" sigue disponible para cotizar con todos los de Envia.
+    if (!raw) return DEFAULT_CARRIERS;
+    if (raw.toLowerCase() === 'all') return undefined;
     const list = raw
       .split(',')
       .map((c) => c.trim())
@@ -288,8 +329,8 @@ export class EnviaProvider implements ShipmentProvider {
    * Devuelve una lista de opciones (una por carrier + servicio + modalidad) para
    * que el comprador elija: cada una con su precio real y su tiempo estimado.
    *
-   * `dropOff` describe [origen → destino]:
-   *   0 = puerta a puerta · 1 = puerta a sucursal · 2 = sucursal a puerta · 3 = sucursal a sucursal
+   * `dropOff` describe [origen → destino] (documentación oficial de Envia):
+   *   0 = puerta a puerta · 1 = sucursal a puerta · 2 = puerta a sucursal · 3 = sucursal a sucursal
    *
    * El origen es POR CARRIER: cada carrier se cotiza con su propia sucursal de
    * origen (la que el admin configuró para esa paquetería) y sólo se ofrecen las
@@ -441,20 +482,31 @@ export class EnviaProvider implements ShipmentProvider {
     return value;
   }
   /**
-   * Modalidades que se pueden ofrecer según dónde esté el origen.
+   * Modalidades que se ofrecen al comprador.
    *
-   * El negocio de TOROX es: el admin deja el paquete en la sucursal de Envia
-   * más cercana (con la etiqueta) y el carrier lo lleva hasta la casa del
-   * comprador. Eso es `dropOff 2` (sucursal a puerta) y es la única modalidad
-   * que se ofrece.
+   * Envia define `dropOff` así (Quote Shipment → data.dropOff):
+   *   0 puerta→puerta · 1 sucursal→puerta · 2 puerta→sucursal · 3 sucursal→sucursal
    *
-   *   - `dropOff 0` (puerta a puerta): no, implicaría que el carrier tiene que
-   *     pasar a retirar el paquete y eso no está dado de alta.
-   *   - `dropOff 1` (puerta a sucursal): no, el comprador siempre recibe en casa.
-   *   - `dropOff 3` (sucursal a sucursal): no, el comprador no retira en sucursal.
+   * ⚠️ Antes el código asumía que 2 era "sucursal→puerta". Era al revés: se le
+   * ofrecía al comprador un envío A SUCURSAL creyendo que era a domicilio.
+   *
+   * ENVIA_DELIVERY_MODES elige qué ve el comprador:
+   *   - HOME   (por defecto): recibe en su casa → 0, y 1 si hay sucursal de origen.
+   *   - BRANCH: retira en una sucursal del correo → 2, y 3 si hay sucursal de origen.
+   *   - "HOME,BRANCH": ambas.
+   *
+   * Con origen "puerta" (dropOff 0/2) el admin igual puede dejar el paquete en
+   * una sucursal del correo: Andreani y Correo Argentino lo aceptan.
    */
   private allowedDropOff(origin: EnviaAddress): number[] {
-    return origin.branchCode ? [2] : [];
+    const modes = (this.config.get<string>('ENVIA_DELIVERY_MODES') || 'HOME')
+      .toUpperCase()
+      .split(',')
+      .map((m) => m.trim());
+    const allowed: number[] = [];
+    if (modes.includes('HOME')) allowed.push(0, ...(origin.branchCode ? [1] : []));
+    if (modes.includes('BRANCH')) allowed.push(2, ...(origin.branchCode ? [3] : []));
+    return allowed;
   }
 
   private async rate(
@@ -473,7 +525,7 @@ export class EnviaProvider implements ShipmentProvider {
           settings: { currency: 'ARS' },
         },
         { headers: this.headers(token) },
-      ),
+      ).pipe(timeout(RATE_TIMEOUT_MS)),
     );
     return response.data?.data ?? [];
   }
@@ -485,13 +537,14 @@ export class EnviaProvider implements ShipmentProvider {
       id: `${item.carrier}|${item.service}|${dropOff}`,
       carrier: item.carrier,
       carrierId: String(item.carrierId ?? ''),
-      carrierName: item.carrierDescription ?? item.carrier,
+      carrierName: prettyCarrierName(item.carrierDescription ?? item.carrier),
       service: item.service,
       serviceDescription: item.serviceDescription,
       dropOff,
       dropOffDescription: item.dropOffDescription,
-      deliveryMode: dropOff === 1 || dropOff === 3 ? 'BRANCH' : 'HOME',
-      pickupMode: dropOff === 2 || dropOff === 3 ? 'BRANCH' : 'DOOR',
+      // Envia: 0 puerta→puerta · 1 sucursal→puerta · 2 puerta→sucursal · 3 sucursal→sucursal
+      deliveryMode: dropOff === 2 || dropOff === 3 ? 'BRANCH' : 'HOME',
+      pickupMode: dropOff === 1 || dropOff === 3 ? 'BRANCH' : 'DOOR',
       cost: Number(item.totalPrice ?? 0),
       currency: item.currency || 'ARS',
       deliveryEstimate: item.deliveryEstimate,
@@ -663,6 +716,18 @@ export class EnviaProvider implements ShipmentProvider {
     }
   }
 
+  /** Carriers habilitados para TOROX (los de ENVIA_CARRIERS), para el admin. */
+  async getEnabledCarriers(): Promise<{ id: string; name: string; description?: string }[]> {
+    const enabled = this.getCarrierSlugs();
+    const all = await this.getCarriers();
+    if (!enabled) return all;
+    const found = all.filter((c) => enabled.includes(c.name));
+    // Si la API no respondió, igual mostramos los habilitados.
+    return found.length
+      ? found
+      : enabled.map((name) => ({ id: name, name, description: prettyCarrierName(name) }));
+  }
+
   // ─── Geocodificación (para el mapa del admin) ───────────────────────────────
 
   /**
@@ -800,18 +865,18 @@ export class EnviaProvider implements ShipmentProvider {
     };
 
     // La sucursal sólo se manda en la dirección que corresponde a la modalidad:
-    //   0 puerta a puerta · 1 puerta a sucursal · 2 sucursal a puerta · 3 sucursal a sucursal
+    //   0 puerta→puerta · 1 sucursal→puerta · 2 puerta→sucursal · 3 sucursal→sucursal
     const dropOff = input.dropOff ?? 0;
     const origin: EnviaAddress = { ...input.origin };
     const destination: EnviaAddress = { ...input.destination };
-    if (dropOff === 0 || dropOff === 1) delete origin.branchCode;
-    if (dropOff === 0 || dropOff === 2) delete destination.branchCode;
-    if ((dropOff === 2 || dropOff === 3) && !origin.branchCode) {
+    if (dropOff === 0 || dropOff === 2) delete origin.branchCode;
+    if (dropOff === 0 || dropOff === 1) delete destination.branchCode;
+    if ((dropOff === 1 || dropOff === 3) && !origin.branchCode) {
       throw new Error(
         'Para enviar desde una sucursal hay que definir la sucursal de origen.',
       );
     }
-    if ((dropOff === 1 || dropOff === 3) && !destination.branchCode) {
+    if ((dropOff === 2 || dropOff === 3) && !destination.branchCode) {
       throw new Error(
         'Para retirar en sucursal hay que elegir la sucursal de destino.',
       );
@@ -842,13 +907,30 @@ export class EnviaProvider implements ShipmentProvider {
             carrier: input.carrier,
             ...(input.service ? { service: input.service } : {}),
           },
-          settings: { currency: 'ARS' },
+          // printFormat y printSize son OBLIGATORIOS al generar la guía (sin
+          // ellos Envia responde "Required property missing: printFormat").
+          // STOCK_4X6 = etiqueta térmica 10x15 cm; para imprimir en hoja A4
+          // común usar ENVIA_PRINT_SIZE=PAPER_4X6.
+          settings: {
+            currency: 'ARS',
+            printFormat: 'PDF',
+            printSize: this.config.get<string>('ENVIA_PRINT_SIZE') || 'STOCK_4X6',
+          },
         },
         { headers: this.headers(token) },
-      ),
-    );
+      ).pipe(timeout(GENERATE_TIMEOUT_MS)),
+    ).catch((error) => {
+      throw new Error(this.describeError(error));
+    });
 
     const data = response.data?.data?.[0];
+    const apiError: any = response.data?.error;
+    if (!data?.trackingNumber && apiError?.message === 'SERVICE_QUOTE_ONLY') {
+      throw new Error(
+        `${input.carrier} (${input.service ?? 'servicio'}) sólo permite cotizar en esta cuenta de Envia, no generar guías. ` +
+          'Elegí otro correo o sacalo de ENVIA_CARRIERS.',
+      );
+    }
     if (!data?.trackingNumber) {
       throw new Error(
         `Envia no devolvió tracking: ${JSON.stringify(response.data?.error ?? response.data)}`,
@@ -873,11 +955,54 @@ export class EnviaProvider implements ShipmentProvider {
     };
   }
 
+  // ─── Cancelar envío (anular etiqueta) ───────────────────────────────────────
+
+  /**
+   * Anula la etiqueta en Envia y pide el reintegro del costo al carrier.
+   * Sólo funciona si el paquete todavía no entró a la red del carrier.
+   * POST /ship/cancel/ { carrier, trackingNumber }
+   */
+  async cancelShipment(params: {
+    carrier: string;
+    trackingNumber: string;
+  }): Promise<{ cancelled: boolean; balanceReturned?: boolean; raw?: unknown }> {
+    const token = this.getToken();
+    if (!token) {
+      throw new ServiceUnavailableException(
+        'Envia.com no está configurado (falta ENVIA_API_KEY).',
+      );
+    }
+    const response = await firstValueFrom(
+      this.http
+        .post<any>(
+          `${this.apiBase}/ship/cancel/`,
+          { carrier: params.carrier, trackingNumber: params.trackingNumber },
+          { headers: this.headers(token) },
+        )
+        .pipe(timeout(RATE_TIMEOUT_MS)),
+    ).catch((error) => {
+      throw new Error(this.describeError(error));
+    });
+    const body = response.data ?? {};
+    const data = Array.isArray(body.data) ? body.data[0] : body.data;
+    const failed = body.meta === 'error' || !!body.error;
+    if (failed) {
+      throw new Error(
+        `Envia no pudo cancelar el envío: ${JSON.stringify(body.error ?? body)}`,
+      );
+    }
+    return {
+      cancelled: true,
+      balanceReturned: data?.balanceReturned ?? data?.balanceRefunded,
+      raw: body,
+    };
+  }
+
   // ─── Estado del envío ───────────────────────────────────────────────────────
 
   async getShipmentStatus(
     trackingNumber: string,
-  ): Promise<{ status: ShipmentStatus; description?: string } | null> {
+  ): Promise<{ status: ShipmentStatus | null; rawStatus: string; description?: string } | null> {
     try {
       const token = this.getToken();
       if (!token) return null;
@@ -894,7 +1019,7 @@ export class EnviaProvider implements ShipmentProvider {
           `${this.apiBase}/ship/generaltrack/`,
           { trackingNumbers: [trackingNumber] },
           { headers: this.headers(token) },
-        ),
+        ).pipe(timeout(RATE_TIMEOUT_MS)),
       );
 
       const data = response.data?.data?.[0];
@@ -903,6 +1028,7 @@ export class EnviaProvider implements ShipmentProvider {
       const lastEvent = data.events?.[data.events.length - 1];
       return {
         status: this.mapStatus(data.status),
+        rawStatus: data.status,
         description: lastEvent?.description,
       };
     } catch (error: any) {
@@ -921,17 +1047,55 @@ export class EnviaProvider implements ShipmentProvider {
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-  mapStatus(enviaStatus?: string): ShipmentStatus {
-    if (!enviaStatus) return ShipmentStatus.PREPARING;
+  /**
+   * Traduce el estado de Envia a nuestro flujo. Devuelve `null` cuando el
+   * estado no es parte del flujo normal (excepción, intento fallido,
+   * devolución, cancelado, etc.): en ese caso el envío NO cambia de estado,
+   * sólo se registra el evento para que el admin lo vea.
+   *
+   * Antes cualquier estado desconocido volvía el envío a PREPARING y
+   * "out for delivery - ..." podía caer como DELIVERED.
+   */
+  mapStatus(enviaStatus?: string): ShipmentStatus | null {
+    if (!enviaStatus) return null;
     const normalized = enviaStatus.toLowerCase().trim();
     if (ENVIA_STATUS_MAP[normalized]) return ENVIA_STATUS_MAP[normalized];
-    // Envia a veces manda estados compuestos: los resolvemos por substring.
-    if (normalized.includes('deliver')) return ShipmentStatus.DELIVERED;
-    if (normalized.includes('out for')) return ShipmentStatus.OUT_FOR_DELIVERY;
-    if (normalized.includes('pick')) return ShipmentStatus.PICKED_UP;
-    if (normalized.includes('transit') || normalized.includes('origin'))
+    // Estados anómalos: no se avanza ni se retrocede.
+    if (
+      /(exception|incidenc|undeliver|not delivered|attempt|intento|return|devol|cancel|lost|damag|hold|retenid)/.test(
+        normalized,
+      )
+    ) {
+      return null;
+    }
+    // Estados compuestos: el orden importa ("out for delivery" contiene "deliver").
+    if (normalized.includes('out for') || normalized.includes('en reparto') || normalized.includes('en distribuci'))
+      return ShipmentStatus.OUT_FOR_DELIVERY;
+    if (normalized.includes('delivered') || normalized.includes('entregado')) return ShipmentStatus.DELIVERED;
+    if (normalized.includes('pick') || normalized.includes('retirado') || normalized.includes('colectado'))
+      return ShipmentStatus.PICKED_UP;
+    if (normalized.includes('transit') || normalized.includes('origin') || normalized.includes('tránsito') || normalized.includes('transito'))
       return ShipmentStatus.IN_TRANSIT;
-    return ShipmentStatus.PREPARING;
+    if (normalized.includes('created') || normalized.includes('ready') || normalized.includes('generad'))
+      return ShipmentStatus.PREPARING;
+    return null;
+  }
+
+  /** Mensaje legible a partir de un error de axios / de la API de Envia. */
+  describeError(error: any): string {
+    const data = error?.response?.data;
+    const apiMessage =
+      data?.error?.message ??
+      data?.error?.description ??
+      (typeof data?.error === 'string' ? data.error : undefined) ??
+      data?.message;
+    if (apiMessage) {
+      return `Envia respondió ${error?.response?.status ?? ''}: ${
+        typeof apiMessage === 'string' ? apiMessage : JSON.stringify(apiMessage)
+      }`.trim();
+    }
+    if (error?.name === 'TimeoutError') return 'Envia no respondió a tiempo (timeout).';
+    return error?.message ?? String(error);
   }
 
   private daysFromNow(days: number): Date {

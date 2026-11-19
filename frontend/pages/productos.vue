@@ -141,8 +141,9 @@ const activeCategory = computed(() =>
         <span class="mx-1.5">/</span>
         <span class="text-slate-600">Productos</span>
       </nav>
-      <h1 class="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-        {{ activeCategory?.name || 'Todos los productos' }}
+      <h1 class="font-display mt-3 text-[2.1rem] text-slate-900 sm:text-5xl">
+        <template v-if="activeCategory"><span class="text-gradient-torox">{{ activeCategory.name }}</span></template>
+        <template v-else>Todos los <span class="text-gradient-torox">productos</span></template>
       </h1>
       <p class="mt-1 text-sm text-slate-500">{{ total }} productos encontrados</p>
     </div>
@@ -152,11 +153,11 @@ const activeCategory = computed(() =>
       <aside class="hidden lg:block overflow-x-hidden">
         <div class="sticky top-24 space-y-5">
           <div>
-            <h3 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">Categorías</h3>
+            <h3 class="label-brass mb-3 !text-sm">Categorías</h3>
             <div class="space-y-1">
               <button
-                class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition"
-                :class="!categoryId ? 'bg-brand-50 font-semibold text-brand-700' : 'text-slate-600 hover:bg-slate-100'"
+                class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors"
+                :class="!categoryId ? 'bg-slate-900 font-semibold text-white dark:bg-white dark:text-[#0d0e10]' : 'text-slate-600 hover:bg-slate-100'"
                 @click="categoryId = ''; applyFilters()"
               >
                 Todas las categorías
@@ -164,8 +165,8 @@ const activeCategory = computed(() =>
               <button
                 v-for="category in categories"
                 :key="category.id"
-                class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition"
-                :class="categoryId === category.id ? 'bg-brand-50 font-semibold text-brand-700' : 'text-slate-600 hover:bg-slate-100'"
+                class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors"
+                :class="categoryId === category.id ? 'bg-slate-900 font-semibold text-white dark:bg-white dark:text-[#0d0e10]' : 'text-slate-600 hover:bg-slate-100'"
                 @click="categoryId = category.id; applyFilters()"
               >
                 <span>{{ category.name }}</span>
@@ -175,7 +176,7 @@ const activeCategory = computed(() =>
           </div>
 
           <div class="border-t border-slate-200 pt-5">
-            <h3 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">Marcas</h3>
+            <h3 class="label-brass mb-3 !text-sm">Marcas</h3>
             <select v-model="brand" class="input-base" @change="applyFilters">
               <option value="">Todas las marcas</option>
               <option v-for="b in brands" :key="b" :value="b">{{ b }}</option>
@@ -183,7 +184,7 @@ const activeCategory = computed(() =>
           </div>
 
           <div class="border-t border-slate-200 pt-5">
-            <h3 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">Precio</h3>
+            <h3 class="label-brass mb-3 !text-sm">Precio</h3>
             <div class="flex items-center gap-2">
               <input v-model="minPrice" type="number" placeholder="Mín" class="input-base" />
               <span class="text-slate-400">—</span>
@@ -259,7 +260,7 @@ const activeCategory = computed(() =>
             v-for="p in totalPages"
             :key="p"
             class="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-semibold transition"
-            :class="p === page ? 'bg-brand-600 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:border-brand-300'"
+            :class="p === page ? 'bg-slate-900 text-white dark:bg-white dark:text-[#0d0e10]' : 'border border-slate-300 bg-white text-slate-700 hover:border-slate-900'"
             @click="goToPage(p)"
           >
             {{ p }}
@@ -279,7 +280,7 @@ const activeCategory = computed(() =>
     <BaseModal :open="mobileFilters" title="Filtros" size="sm" @close="mobileFilters = false">
       <div class="space-y-5">
         <div>
-          <h3 class="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">Categorías</h3>
+          <h3 class="label-brass mb-2 !text-sm">Categorías</h3>
           <select v-model="categoryId" class="input-base" @change="applyFilters">
             <option value="">Todas las categorías</option>
             <option v-for="category in categories" :key="category.id" :value="category.id">
@@ -288,14 +289,14 @@ const activeCategory = computed(() =>
           </select>
         </div>
         <div>
-          <h3 class="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">Marca</h3>
+          <h3 class="label-brass mb-2 !text-sm">Marca</h3>
           <select v-model="brand" class="input-base" @change="applyFilters">
             <option value="">Todas las marcas</option>
             <option v-for="b in brands" :key="b" :value="b">{{ b }}</option>
           </select>
         </div>
         <div>
-          <h3 class="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">Precio</h3>
+          <h3 class="label-brass mb-2 !text-sm">Precio</h3>
           <div class="flex items-center gap-2">
             <input v-model="minPrice" type="number" placeholder="Mín" class="input-base" />
             <span class="text-slate-400">—</span>

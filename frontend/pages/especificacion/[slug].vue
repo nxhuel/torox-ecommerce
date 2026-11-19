@@ -5,7 +5,7 @@ import {
   Truck,
   ShieldCheck,
   CreditCard,
-  RefreshCw,
+  MessageCircle,
   ChevronRight,
   Check,
   Gift,
@@ -16,6 +16,7 @@ import { favoritesService, productsService } from '~/services'
 import { useAuthStore } from '~/stores/auth'
 import { useCartStore } from '~/stores/cart'
 import { PROMOTION_TYPE_LABELS, useFormat } from '~/composables/useFormat'
+import { STORE, whatsappLink } from '~/utils/store'
 
 const route = useRoute()
 const router = useRouter()
@@ -205,11 +206,11 @@ function isVideo(url: string) {
         <!-- Gallery -->
         <div>
           <div
-            class="relative overflow-hidden rounded-2xl border border-slate-200 !bg-white">
+            class="product-well relative overflow-hidden rounded-2xl">
             <video v-if="currentMedia && isVideo(currentMedia)" :key="currentMedia" :src="currentMedia" controls
               autoplay muted loop class="aspect-square w-full bg-black object-contain" />
             <template v-else>
-              <AppImage :src="currentMedia" :alt="product.name" :seed="product.slug" class="aspect-square w-full object-contain" />
+              <AppImage :src="currentMedia" :alt="product.name" :seed="product.slug" loading="eager" class="aspect-square w-full object-contain p-6 mix-blend-multiply" />
             </template>
           </div>
           <div v-if="gallery.length > 1" class="mt-3 flex flex-wrap gap-3">
@@ -229,10 +230,10 @@ function isVideo(url: string) {
         <!-- Info -->
         <div>
           <p v-if="product.brand"
-            class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            class="label-brass !text-sm">
             {{ product.brand }}
           </p>
-          <h1 class="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl dark:text-white">{{ product.name }}</h1>
+          <h1 class="font-display mt-3 text-[1.9rem] leading-[1.08] text-slate-900 [text-wrap:balance] sm:text-[2.6rem] dark:text-white">{{ product.name }}</h1>
 
           <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
             <span class="rounded-full px-2.5 py-0.5 font-semibold"
@@ -318,7 +319,7 @@ function isVideo(url: string) {
 
               <!-- Agregar al carrito -->
               <button type="button"
-                class="flex flex-1 items-center justify-center gap-2 rounded-md bg-[#E3EDFB] px-4 py-3 text-[#3483FA] transition hover:bg-[#d5e5fa] disabled:cursor-not-allowed disabled:opacity-50"
+                class="btn flex-1 border border-slate-300 px-4 py-3 text-base text-slate-900 hover:border-slate-900 dark:border-white/20 dark:text-white dark:hover:border-white/60"
                 :disabled="currentStock === 0 || added" @click="addToCart">
                 <Check v-if="added" class="h-4 w-4 shrink-0" />
 
@@ -358,41 +359,36 @@ function isVideo(url: string) {
             </button>
           </div>
 
-          <!-- <div class="mt-5 grid gap-3 sm:grid-cols-2">
-            <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card dark:bg-dark-800">
-              <Truck class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" />
-              <div>
-                <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">Envío por el correo</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card dark:bg-dark-800">
-              <CreditCard class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" />
-              <div>
-                <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">Pago simulado</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Tarjetas y transferencia</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card dark:bg-dark-800">
-              <ShieldCheck class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" />
-              <div>
-                <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">Garantía de 30 días</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Cubierta por el fabricante</p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 rounded-xl bg-white p-4 shadow-card dark:bg-dark-800">
-              <RefreshCw class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" />
-              <div>
-                <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">Cambio fácil</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">30 días para devoluciones</p>
-              </div>
-            </div>
-          </div> -->
+          <!-- Confianza: lo que necesita saber antes de pagar -->
+          <ul class="rule-brass mt-6 divide-y divide-brass-500/25 border-y text-sm">
+            <li class="flex items-start gap-3 py-3">
+              <Truck class="mt-0.5 h-4 w-4 shrink-0 text-brass-600 dark:text-brass-400" />
+              <span class="text-slate-700 dark:text-slate-300">Envío a todo el país con seguimiento. El costo se calcula con tu código postal en el checkout.</span>
+            </li>
+            <li class="flex items-start gap-3 py-3">
+              <CreditCard class="mt-0.5 h-4 w-4 shrink-0 text-brass-600 dark:text-brass-400" />
+              <span class="text-slate-700 dark:text-slate-300">Pagás con Mercado Pago: tarjeta, débito o dinero en cuenta.</span>
+            </li>
+            <li class="flex items-start gap-3 py-3">
+              <ShieldCheck class="mt-0.5 h-4 w-4 shrink-0 text-brass-600 dark:text-brass-400" />
+              <span class="text-slate-700 dark:text-slate-300">Garantía de {{ STORE.warrantyDays }} días.</span>
+            </li>
+          </ul>
+          <a
+            :href="whatsappLink(`Hola! Tengo una consulta sobre: ${product.name}`)"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 underline underline-offset-4 hover:text-torox dark:text-white"
+          >
+            <MessageCircle class="h-4 w-4 text-[#25D366]" />
+            ¿Dudas con este producto? Consultanos por WhatsApp
+          </a>
         </div>
       </div>
 
       <!-- Características del producto -->
       <section v-if="specGroups.length" id="caracteristicas" class="mt-12 scroll-mt-24">
-        <h2 class="mb-5 text-xl font-bold text-slate-900 sm:text-2xl dark:text-white">Características del producto</h2>
+        <h2 class="font-display mb-5 text-[1.7rem] text-slate-900 sm:text-4xl dark:text-white">Características <span class="text-gradient-torox">del producto</span></h2>
         <div class="grid gap-5">
           <div v-for="group in specGroups" :key="group.title"
             class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card dark:border-slate-700/70 dark:bg-dark-800">
@@ -422,7 +418,7 @@ function isVideo(url: string) {
 
       <!-- Related -->
       <section v-if="related.length" class="mt-14">
-        <h2 class="mb-6 text-xl font-bold text-slate-900 sm:text-2xl dark:text-white">Productos relacionados</h2>
+        <h2 class="font-display mb-6 text-[1.7rem] text-slate-900 sm:text-4xl dark:text-white">Productos <span class="text-gradient-torox">relacionados</span></h2>
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           <ProductCard v-for="item in related" :key="item.id" :product="item" />
         </div>

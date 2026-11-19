@@ -1,191 +1,114 @@
 <script setup lang="ts">
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { ArrowUpRight, MessageCircle, Mail, Instagram, ShieldCheck } from 'lucide-vue-next'
 import type { Product } from '~/types'
 import { productsService } from '~/services'
+import { STORE, whatsappLink } from '~/utils/store'
 
-import heroSlide1 from '~/assets/fondo-hero-uno.png'
-import heroSlide2 from '~/assets/fondo-hero-dos.png'
+useSeoMeta({
+  title: 'TOROX — Cámaras, cerraduras inteligentes y seguridad para tu casa',
+  description:
+    'Cámaras Wi-Fi, cerraduras inteligentes y accesorios de seguridad con envío a todo el país. Pagás con Mercado Pago y te asesoramos por WhatsApp.',
+  ogTitle: 'TOROX — Seguridad para tu casa y tu negocio',
+  ogDescription: 'Cámaras, cerraduras inteligentes y accesorios con envío a todo el país.',
+  ogImage: '/logo.png',
+})
 
 const featured = ref<Product[]>([])
 const loading = ref(true)
 
-const heroSlides = [
-  {
-    image: heroSlide1,
-    title: 'PROTECCIÓN INTELIGENTE PARA LO QUE MÁS IMPORTA',
-    description: 'Soluciones avanzadas de seguridad para hogares y empresas. Cámaras, alarmas y tecnología diseñada para proteger tus espacios las 24 horas.',
-    ctaText: 'Protegete',
-    ctaLink: '/productos',
-    secondaryCtaText: 'Ver productos',
-    secondaryCta: '/productos',
-  },
-  {
-    image: heroSlide2,
-    title: 'VIGILANCIA EN TIEMPO REAL',
-    description: 'Monitoreá tus espacios desde cualquier lugar del mundo. Tú decides cuándo, cómo y desde qué dispositivo.',
-    ctaText: 'Ver monitoreo',
-    ctaLink: '/productos',
-    secondaryCtaText: 'Explorar cámaras',
-    secondaryCta: '/productos?search=camaras',
-  }
-]
-
-const currentIndex = ref(0)
-const currentSlide = computed(() => heroSlides[currentIndex.value])
-
-let heroTimer: ReturnType<typeof setInterval> | null = null
-
-function next() {
-  currentIndex.value = (currentIndex.value + 1) % heroSlides.length
-  resetTimer()
-}
-
-function prev() {
-  currentIndex.value = (currentIndex.value - 1 + heroSlides.length) % heroSlides.length
-  resetTimer()
-}
-
-function goTo(idx: number) {
-  currentIndex.value = idx
-  resetTimer()
-}
-
-function resetTimer() {
-  if (heroTimer) clearInterval(heroTimer)
-  heroTimer = setInterval(next, 6000)
-}
-
-onMounted(() => {
-  resetTimer()
-  loadFeatured()
-})
-
-onUnmounted(() => {
-  if (heroTimer) clearInterval(heroTimer)
-})
-
-async function loadFeatured() {
+onMounted(async () => {
   try {
     featured.value = await productsService.featured()
+  } catch {
+    featured.value = []
   } finally {
     loading.value = false
   }
-}
+})
 </script>
 
 <template>
   <div>
-    <!-- Hero carousel -->
-    <section class="relative overflow-hidden bg-dark-900">
-      <div class="absolute inset-0">
-        <Transition name="fade">
-          <img
-            :key="currentIndex"
-            :src="currentSlide.image"
-            :alt="currentSlide.title"
-            class="absolute inset-0 h-full w-full object-cover"
-          />
-        </Transition>
-        <div class="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/50" />
-      </div>
+    <StorefrontHero />
 
-      <div class="container-torox relative flex min-h-[70vh] flex-col items-center justify-center py-24 text-center lg:min-h-[80vh]">
-        <Transition name="fade" mode="out-in">
-          <!-- <div :key="currentIndex" class="mx-auto max-w-3xl">
-            <h1 class="text-4xl font-black leading-tight text-white sm:text-5xl lg:text-6xl">
-              {{ currentSlide.title }}
-            </h1>
-            <p class="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-slate-200 sm:text-lg">
-              {{ currentSlide.description }}
-            </p>
-            <div class="mt-10 flex flex-wrap justify-center gap-4">
-              <NuxtLink :to="currentSlide.ctaLink" class="btn-primary !px-8 !py-3.5 !text-base">
-                {{ currentSlide.ctaText }} <ArrowRight class="h-5 w-5" />
-              </NuxtLink>
-              <NuxtLink :to="currentSlide.secondaryCta" class="btn !border !border-white/20 !bg-white/10 !px-8 !py-3.5 !text-base !text-white backdrop-blur hover:!bg-white/20">
-                {{ currentSlide.secondaryCtaText }} <Percent class="h-5 w-5" />
-              </NuxtLink>
-            </div>
-          </div> -->
-        </Transition>
-      </div>
-
-      <!-- Hero nav arrows -->
-      <button
-        class="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow-lg backdrop-blur transition hover:bg-white sm:left-8"
-        aria-label="Anterior slide"
-        @click="prev"
-      >
-        <ChevronLeft class="h-5 w-5" />
-      </button>
-      <button
-        class="absolute right-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow-lg backdrop-blur transition hover:bg-white sm:right-8"
-        aria-label="Siguiente slide"
-        @click="next"
-      >
-        <ChevronRight class="h-5 w-5" />
-      </button>
-
-      <!-- Dots -->
-      <div class="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2">
-        <button
-          v-for="(slide, idx) in heroSlides"
-          :key="idx"
-          class="h-2 w-6 cursor-pointer rounded-full bg-white/40 transition-all duration-300 hover:bg-white/60"
-          :class="idx === currentIndex ? '!w-10 !bg-white' : ''"
-          :aria-label="`Slide ${idx + 1}`"
-          @click="goTo(idx)"
+    <!-- Destacados: sobre el fondo de la página, las cards son la superficie -->
+    <section class="py-14 lg:py-24">
+      <div class="container-torox">
+        <div class="mb-8 flex items-end justify-between gap-4">
+          <h2 class="font-display text-[2.1rem] text-slate-900 sm:text-5xl">Productos <span class="text-gradient-torox">destacados</span></h2>
+          <NuxtLink to="/productos" class="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sm font-semibold text-torox underline-offset-4 hover:underline dark:text-torox-sky">
+            Ver todo<span class="hidden sm:inline">&nbsp;el catálogo</span> <ArrowUpRight class="h-4 w-4" />
+          </NuxtLink>
+        </div>
+        <div v-if="loading" class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 lg:gap-6">
+          <BaseSkeleton v-for="i in 8" :key="i" class="aspect-[3/4] !rounded-2xl" />
+        </div>
+        <div v-else-if="featured.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 lg:gap-6">
+          <ProductCard v-for="product in featured" :key="product.id" :product="product" />
+        </div>
+        <EmptyState
+          v-else
+          title="Todavía no hay productos destacados"
+          description="Mirá el catálogo completo para ver todo lo que tenemos."
         />
       </div>
     </section>
 
-    <!-- Benefits card -->
-    <div class="relative z-10 -mt-12 lg:-mt-14">
-      <div class="container-torox">
-        <StorefrontBenefits />
-      </div>
-    </div>
+    <!-- Momento tipográfico -->
+    <StorefrontStatement />
 
-    <!-- Featured -->
-    <section class="-mt-12 bg-slate-100 pt-12 pb-12 dark:bg-dark-900 lg:-mt-14 lg:pt-14 lg:pb-16 overflow-x-hidden">
-      <div class="container-torox pt-8 overflow-x-hidden">
-        <div class="mb-8 flex items-end justify-between">
-          <div>
-            <h2 class="text-2xl font-bold text-slate-900 sm:text-3xl dark:text-white">Productos destacados</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Selección especial de nuestro catálogo</p>
-          </div>
-          <NuxtLink to="/productos" class="hidden items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-800 dark:text-brand-400 dark:hover:text-brand-300 sm:flex">
-            Ver todos <ArrowRight class="h-4 w-4" />
-          </NuxtLink>
+    <!-- Opiniones -->
+    <StorefrontTestimonials />
+
+    <!-- Atención -->
+    <section class="py-16 lg:py-24">
+      <div class="container-torox grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:items-center">
+        <div>
+          <h2 class="font-display text-[2.1rem] text-slate-900 sm:text-5xl">Del otro lado hay <span class="text-gradient-torox">una persona.</span></h2>
+          <p class="mt-5 max-w-lg text-lg leading-relaxed text-slate-600">
+            Somos TOROX, de {{ STORE.area }}. Si no sabés qué cámara te conviene para tu casa o tu local,
+            o no te sale vincularla con la app, escribinos y lo resolvemos con vos.
+          </p>
+          <a
+            :href="whatsappLink('Hola! Quiero hacer una consulta.')"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn mt-8 rounded-xl bg-[#25D366] px-6 py-3.5 text-base text-[#06231a] hover:brightness-95"
+          >
+            <MessageCircle class="h-5 w-5" /> Hablar por WhatsApp
+          </a>
         </div>
-        <div v-if="loading" class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          <BaseSkeleton v-for="i in 8" :key="i" class="aspect-[3/4] !rounded-xl" />
-        </div>
-        <div v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          <ProductCard v-for="product in featured" :key="product.id" :product="product" />
-        </div>
+
+        <ul class="rule-brass divide-y divide-brass-500/25 border-y">
+          <li class="flex flex-wrap items-center gap-x-4 gap-y-1 py-4">
+            <MessageCircle class="h-5 w-5 shrink-0 text-brass-600 dark:text-brass-400" />
+            <span class="flex-1 text-slate-600">WhatsApp</span>
+            <a :href="whatsappLink()" target="_blank" rel="noopener noreferrer" class="font-semibold text-slate-900 hover:underline">{{ STORE.whatsappDisplay }}</a>
+          </li>
+          <li class="flex flex-wrap items-center gap-x-4 gap-y-1 py-4">
+            <Mail class="h-5 w-5 shrink-0 text-brass-600 dark:text-brass-400" />
+            <span class="flex-1 text-slate-600">Mail</span>
+            <a :href="`mailto:${STORE.email}`" class="font-semibold text-slate-900 hover:underline">{{ STORE.email }}</a>
+          </li>
+          <li class="flex flex-wrap items-center gap-x-4 gap-y-1 py-4">
+            <Instagram class="h-5 w-5 shrink-0 text-brass-600 dark:text-brass-400" />
+            <span class="flex-1 text-slate-600">Instagram</span>
+            <a :href="STORE.social.instagram" target="_blank" rel="noopener noreferrer" class="font-semibold text-slate-900 hover:underline">{{ STORE.social.instagramHandle }}</a>
+          </li>
+          <li class="flex flex-wrap items-center gap-x-4 gap-y-1 py-4">
+            <ShieldCheck class="h-5 w-5 shrink-0 text-brass-600 dark:text-brass-400" />
+            <span class="flex-1 text-slate-600">Garantía</span>
+            <span class="font-semibold text-slate-900">{{ STORE.warrantyDays }} días en todos los productos</span>
+          </li>
+        </ul>
       </div>
     </section>
 
-    <!-- Testimonials -->
-    <StorefrontTestimonials />
-
-    <!-- FAQ -->
-    <section class="bg-white py-12 lg:py-16">
+    <!-- Preguntas frecuentes -->
+    <section class="bg-[#fff] py-16 dark:bg-dark-900 lg:py-24">
       <div class="container-torox">
         <StorefrontFaq />
       </div>
     </section>
   </div>
 </template>
-
-<style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.7s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>

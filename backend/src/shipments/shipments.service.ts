@@ -73,6 +73,7 @@ export class ShipmentsService {
   }> {
     let totalWeight = 0;
     let declaredValue = 0;
+    let totalVolume = 0;
     let maxWidth = this.DEFAULT_WIDTH_CM;
     let maxHeight = this.DEFAULT_HEIGHT_CM;
     let maxLength = this.DEFAULT_LENGTH_CM;
@@ -81,28 +82,42 @@ export class ShipmentsService {
     for (const item of items) {
       try {
         const product = await this.productsService.findOne(item.productId);
-        if (product.weightKg == null) {
+        if (
+          product.weightKg == null ||
+          product.widthCm == null ||
+          product.heightCm == null ||
+          product.lengthCm == null
+        ) {
           missingData.push({ productId: item.productId, name: product.name });
         }
-        if (product.widthCm == null || product.heightCm == null || product.lengthCm == null) {
-          missingData.push({ productId: item.productId, name: product.name });
-        }
-        totalWeight += (product.weightKg ?? this.DEFAULT_WEIGHT_KG) * item.quantity;
-        declaredValue += (product.finalPrice ?? product.price ?? 0) * item.quantity;
-        maxWidth = Math.max(maxWidth, product.widthCm ?? this.DEFAULT_WIDTH_CM);
-        maxHeight = Math.max(maxHeight, product.heightCm ?? this.DEFAULT_HEIGHT_CM);
-        maxLength = Math.max(maxLength, product.lengthCm ?? this.DEFAULT_LENGTH_CM);
+        const w = Number(product.widthCm ?? this.DEFAULT_WIDTH_CM);
+        const h = Number(product.heightCm ?? this.DEFAULT_HEIGHT_CM);
+        const l = Number(product.lengthCm ?? this.DEFAULT_LENGTH_CM);
+        totalWeight += Number(product.weightKg ?? this.DEFAULT_WEIGHT_KG) * item.quantity;
+        declaredValue += Number(product.finalPrice ?? product.price ?? 0) * item.quantity;
+        totalVolume += w * h * l * item.quantity;
+        maxWidth = Math.max(maxWidth, w);
+        maxHeight = Math.max(maxHeight, h);
+        maxLength = Math.max(maxLength, l);
       } catch {
         totalWeight += this.DEFAULT_WEIGHT_KG * item.quantity;
+        totalVolume +=
+          this.DEFAULT_WIDTH_CM * this.DEFAULT_HEIGHT_CM * this.DEFAULT_LENGTH_CM * item.quantity;
       }
     }
     if (totalWeight <= 0) totalWeight = this.DEFAULT_WEIGHT_KG;
 
+    // Varias unidades no entran en la caja de una sola: apilamos en altura
+    // (base = ancho × largo máximos) para no subdeclarar el volumen, que es
+    // lo que usan los correos para el peso volumétrico.
+    const stackedHeight = Math.ceil(totalVolume / (maxWidth * maxLength));
+    const height = Math.max(maxHeight, stackedHeight);
+
     return {
-      weightKg: totalWeight,
-      widthCm: maxWidth,
-      heightCm: maxHeight,
-      lengthCm: maxLength,
+      weightKg: Math.round(totalWeight * 100) / 100,
+      widthCm: Math.ceil(maxWidth),
+      heightCm: height,
+      lengthCm: Math.ceil(maxLength),
       declaredValue,
       missingData,
     };
@@ -183,26 +198,21 @@ export class ShipmentsService {
   }> {
     const envOrigin = this.envia.envOrigin();
     const map = await this.getOriginBranches();
-    // Sólo se cotizan los carriers con sucursal de origen configurada: el
-    // paquete se deja ahí y desde ahí el carrier lo lleva a la casa del
-    // comprador. Sin sucursal de origen no hay envío posible.
-    const list = carriers.filter((carrier) => map[carrier]?.branchCode);
-
-    if (!list.length) {
-      this.logger.warn(
-        'No hay ninguna sucursal de origen configurada: se necesita una para cotizar entregas a domicilio (Admin → Sucursales Envia).',
-      );
-      throw new BadRequestException(
-        'No hay entregas a domicilio disponibles por el momento.',
-      );
-    }
+    // Todos los carriers se cotizan. Si el admin configuró una sucursal de
+    // origen para un carrier, se cotiza desde ahí (eso habilita las
+    // modalidades "desde sucursal"); si no, desde la dirección del .env.
+    const list = carriers;
 
     const origins: Record<string, EnviaAddress> = {};
     const branches: Record<string, BranchInfo> = {};
     for (const carrier of list) {
       const branch = map[carrier];
-      origins[carrier] = this.branchToAddress(branch, envOrigin);
-      branches[carrier] = branch;
+      if (branch?.branchCode) {
+        origins[carrier] = this.branchToAddress(branch, envOrigin);
+        branches[carrier] = branch;
+      } else {
+        origins[carrier] = envOrigin;
+      }
     }
     return { origins, branches, carriers: list };
   }
@@ -494,7 +504,7 @@ export class ShipmentsService {
       branches: nearby,
       totalBranches: branches.length,
       radiusKm: radius,
-      carriers: await this.envia.getCarriers(),
+      carriers: await this.envia.getEnabledCarriers(),
       configuredCarriers: configured ?? [],
       environment: {
         apiBase: this.envia.apiBase,
@@ -617,9 +627,14 @@ export class ShipmentsService {
     // misma sucursal con la que se cotizó (aunque el admin después cambie el
     // origen configurado). Los pedidos viejos, sin origen guardado, usan el
     // origen vigente del carrier.
-    const origin = order.shippingOrigin
+    let origin = order.shippingOrigin
       ? this.snapshotToAddress(order.shippingOrigin)
       : (await this.resolveOriginForCarrier(option.carrier)).address;
+    // En las modalidades con origen "puerta" (0 y 2) la guía sale desde la
+    // dirección de TOROX, no desde la sucursal configurada.
+    if ((option.dropOff ?? 0) === 0 || option.dropOff === 2) {
+      origin = this.envia.envOrigin();
+    }
 
     const result = await this.provider.createShipment({
       orderNumber: order.orderNumber,
@@ -699,6 +714,121 @@ export class ShipmentsService {
     };
   }
 
+  // ─── Cambiar el correo de un pedido (admin) ────────────────────────────────
+
+  /** Carga un pedido al que todavía se le puede cambiar el correo. */
+  private async loadOrderForCarrierChange(orderId: string): Promise<Order> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId }, relations: { items: true } });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    if (order.shippingMethod === ShippingMethod.PICKUP) {
+      throw new BadRequestException('Este pedido se retira en el local: no tiene correo.');
+    }
+    const existing = await this.repo.findOne({ where: { orderId } });
+    if (existing) {
+      throw new BadRequestException(
+        'El pedido ya tiene una guía generada. Anulala primero para poder cambiar el correo.',
+      );
+    }
+    return order;
+  }
+
+  /**
+   * Opciones de envío disponibles hoy para la dirección y los productos de un
+   * pedido ya pagado. Sólo entrega a domicilio (el comprador eligió domicilio).
+   */
+  async optionsForOrder(orderId: string) {
+    const order = await this.loadOrderForCarrierChange(orderId);
+    const address = order.shippingAddress;
+    const options = await this.quoteOptions({
+      province: address.province,
+      city: address.city,
+      postalCode: address.postalCode,
+      address: address.address,
+      number: address.number,
+      items: order.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+    });
+    return {
+      current: order.shippingOption ?? null,
+      chargedShipping: Number(order.shippingCost ?? 0),
+      options: options.filter((o) => o.deliveryMode === 'HOME'),
+    };
+  }
+
+  /**
+   * Cambia el correo/servicio de un pedido antes de generar la guía. Lo que el
+   * cliente pagó NO cambia: si el correo nuevo cuesta más, la diferencia la
+   * absorbe TOROX (queda anotada en las notas del pedido).
+   */
+  async changeOrderOption(orderId: string, optionId: string) {
+    const order = await this.loadOrderForCarrierChange(orderId);
+    const address = order.shippingAddress;
+    const { options, origins, branches } = await this.quoteWithOrigins({
+      province: address.province,
+      city: address.city,
+      postalCode: address.postalCode,
+      address: address.address,
+      number: address.number,
+      items: order.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+    });
+    const option = options.find((o) => o.id === optionId);
+    if (!option) {
+      throw new BadRequestException('Esa opción de envío ya no está disponible. Volvé a cargar las opciones.');
+    }
+    if (option.deliveryMode !== 'HOME') {
+      throw new BadRequestException('Sólo se puede cambiar a otra entrega a domicilio.');
+    }
+
+    const previous = order.shippingOption;
+    order.shippingOption = {
+      id: option.id,
+      carrier: option.carrier,
+      carrierName: option.carrierName,
+      service: option.service,
+      serviceDescription: option.serviceDescription,
+      dropOff: option.dropOff,
+      dropOffDescription: option.dropOffDescription,
+      deliveryMode: option.deliveryMode,
+      pickupMode: option.pickupMode,
+      cost: option.cost,
+      currency: option.currency,
+      deliveryEstimate: option.deliveryEstimate,
+      deliveryDate: option.deliveryDate,
+    };
+    const origin = origins[option.carrier] ?? this.envia.envOrigin();
+    const branch = branches[option.carrier];
+    order.shippingOrigin = {
+      carrier: option.carrier,
+      branchCode: origin.branchCode ?? null,
+      reference: branch?.reference ?? null,
+      address: {
+        name: origin.name,
+        company: origin.company,
+        email: origin.email,
+        phone: origin.phone,
+        street: origin.street,
+        number: origin.number,
+        city: origin.city,
+        state: origin.state,
+        country: origin.country,
+        postalCode: origin.postalCode,
+        ...(origin.branchCode ? { branchCode: origin.branchCode } : {}),
+      },
+    };
+
+    const stamp = new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+    const charged = Number(order.shippingCost ?? 0);
+    const diff = Math.round((option.cost - charged) * 100) / 100;
+    const note =
+      `[${stamp}] Correo cambiado por el admin: ` +
+      `${previous ? `${previous.carrierName} ${previous.service}` : 'sin correo'} → ${option.carrierName} ${option.service} ` +
+      `($${option.cost}). El cliente pagó $${charged} de envío` +
+      (diff > 0 ? `; diferencia a cargo de TOROX: $${diff}.` : '.');
+    order.notes = order.notes ? `${order.notes}\n${note}` : note;
+    await this.orderRepo.save(order);
+    this.logger.warn(`Pedido ${order.orderNumber}: ${note}`);
+    return { shippingOption: order.shippingOption, chargedShipping: charged, difference: diff };
+  }
+
   /**
    * Genera (o reintenta generar) la guía de un pedido puntual. Se usa desde el
    * admin cuando el envío no se pudo crear al aprobar el pago.
@@ -709,7 +839,15 @@ export class ShipmentsService {
       relations: { items: true },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
-    const shipment = await this.createForOrder(order);
+    let shipment: Shipment | null;
+    try {
+      shipment = await this.createForOrder(order);
+    } catch (error: any) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) throw error;
+      throw new BadRequestException(
+        `No se pudo generar la guía: ${this.envia.describeError(error)}`,
+      );
+    }
     if (!shipment) {
       throw new BadRequestException(
         'Este pedido se retira en el local de TOROX: no genera guía de envío.',
@@ -816,10 +954,16 @@ export class ShipmentsService {
     if (!shipment.trackingNumber) return shipment;
 
     const remote = await this.envia.getShipmentStatus(shipment.trackingNumber);
-    if (!remote) return shipment;
+    if (!remote) {
+      throw new BadRequestException(
+        'Envia no devolvió información de seguimiento para esta guía todavía.',
+      );
+    }
 
-    if (remote.status !== shipment.status) {
+    if (remote.status && remote.status !== shipment.status) {
       await this.applyStatus(shipment, remote.status, remote.description);
+    } else if (!remote.status) {
+      await this.recordIncident(shipment, remote.rawStatus, remote.description);
     }
     return shipment;
   }
@@ -834,12 +978,95 @@ export class ShipmentsService {
     description?: string,
   ): Promise<void> {
     const shipment = await this.repo.findOne({ where: { trackingNumber } });
-    if (!shipment) return;
+    if (!shipment) {
+      this.logger.warn(`Webhook Envia para una guía que no existe en TOROX: ${trackingNumber}`);
+      return;
+    }
 
     const mapped = this.envia.mapStatus(newStatus);
+    if (!mapped) {
+      // Incidencia (intento fallido, devolución, retenido…): se registra sin
+      // mover el estado, para que el admin la vea en el pedido.
+      await this.recordIncident(shipment, newStatus, description);
+      return;
+    }
     if (mapped === shipment.status) return;
+    // Los webhooks pueden llegar desordenados: nunca retrocedemos el estado.
+    if (this.statusRank(mapped) < this.statusRank(shipment.status)) {
+      this.logger.log(
+        `Webhook Envia ignorado por ser anterior al estado actual (${shipment.status} ← ${mapped}) para ${trackingNumber}`,
+      );
+      return;
+    }
 
     await this.applyStatus(shipment, mapped, description);
+  }
+
+  private statusRank(status: ShipmentStatus): number {
+    return [
+      ShipmentStatus.PREPARING,
+      ShipmentStatus.PICKED_UP,
+      ShipmentStatus.IN_TRANSIT,
+      ShipmentStatus.OUT_FOR_DELIVERY,
+      ShipmentStatus.DELIVERED,
+    ].indexOf(status);
+  }
+
+  /** Agrega un evento de incidencia al historial sin cambiar el estado. */
+  private async recordIncident(
+    shipment: Shipment,
+    rawStatus?: string,
+    description?: string,
+  ): Promise<void> {
+    const text = `Novedad del correo: ${description || rawStatus || 'sin detalle'}`;
+    const last = shipment.events?.[shipment.events.length - 1];
+    if (last?.description === text) return; // evita duplicados
+    shipment.events = [
+      ...(shipment.events || []),
+      { status: shipment.status, date: new Date(), description: text },
+    ];
+    await this.repo.save(shipment);
+  }
+
+  /**
+   * Anula la guía en Envia (reintegro del costo de la etiqueta) y libera el
+   * pedido para poder generar una nueva. Sólo si el paquete todavía no fue
+   * despachado. La guía anulada queda anotada en las notas del pedido.
+   */
+  async cancelShipment(id: string): Promise<{ cancelled: true; balanceReturned?: boolean }> {
+    const shipment = await this.findOne(id);
+    if (shipment.status !== ShipmentStatus.PREPARING) {
+      throw new BadRequestException(
+        'Sólo se pueden anular guías que todavía no fueron despachadas.',
+      );
+    }
+    const order = await this.orderRepo.findOne({ where: { id: shipment.orderId } });
+    const carrierSlug = order?.shippingOption?.carrier ?? order?.shippingOrigin?.carrier;
+    if (!carrierSlug) {
+      throw new BadRequestException(
+        'No se pudo determinar la paquetería de este envío. Anulalo desde el panel de Envia.com.',
+      );
+    }
+
+    let result: { cancelled: boolean; balanceReturned?: boolean };
+    try {
+      result = await this.envia.cancelShipment({
+        carrier: carrierSlug,
+        trackingNumber: shipment.trackingNumber,
+      });
+    } catch (error: any) {
+      throw new BadRequestException(error?.message ?? 'Envia no pudo anular la guía.');
+    }
+
+    if (order) {
+      const stamp = new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+      const note = `[${stamp}] Guía ${shipment.trackingNumber} (${shipment.carrier}) anulada en Envia.`;
+      order.notes = order.notes ? `${order.notes}\n${note}` : note;
+      await this.orderRepo.save(order);
+    }
+    await this.repo.remove(shipment);
+    this.logger.warn(`Guía ${shipment.trackingNumber} anulada en Envia.`);
+    return { cancelled: true, balanceReturned: result.balanceReturned };
   }
 
   private async applyStatus(

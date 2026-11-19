@@ -244,6 +244,9 @@ export const shipmentsService = {
   /** Genera (o reintenta) la guía en Envia.com para un pedido (admin). */
   generateForOrder: (orderId: string) =>
     api().api<Shipment>(`/shipments/order/${orderId}/generate`, { method: 'POST' }),
+  /** Anula la guía en Envia.com y libera el pedido para regenerarla (admin). */
+  cancel: (id: string) =>
+    api().api<{ cancelled: boolean; balanceReturned?: boolean }>(`/shipments/${id}/cancel`, { method: 'POST' }),
   /** Sincroniza el estado del envío con la API de Envia.com (admin). */
   sync: (id: string) => api().api<Shipment>(`/shipments/${id}/sync`, { method: 'POST' }),
 }

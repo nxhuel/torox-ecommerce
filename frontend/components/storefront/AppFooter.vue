@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { Phone, Mail, MapPin } from 'lucide-vue-next'
-import Instagram from '~/assets/icon-instagram.png'
-import Facebook from '~/assets/icon-facebook.png'
-import TikTok from '~/assets/icon-tiktok.png'
-import WhatsApp from '~/assets/icon-wspp.png'
+import { STORE, whatsappLink } from '~/utils/store'
+import instagramIcon from '~/assets/social/instagram.webp'
+import facebookIcon from '~/assets/social/facebook.webp'
+import tiktokIcon from '~/assets/social/tiktok.webp'
 import MercadoPago from '~/assets/payments/mercadopago.svg'
 import Visa from '~/assets/payments/visa.svg'
 import Mastercard from '~/assets/payments/mastercard.svg'
@@ -12,151 +11,83 @@ import logo from '~/assets/logo.png'
 import { useAuthStore } from '~/stores/auth'
 
 const auth = useAuthStore()
+const route = useRoute()
 
 onMounted(() => auth.init())
 
-const SUPPORT_WHATSAPP = '5491171383512'
-const supportMessage = 'Hola! Necesito ayuda y soporte con mi compra en TOROX.'
-const supportUrl = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(supportMessage)}`
+const supportUrl = whatsappLink('Hola! Necesito ayuda con mi compra en TOROX.')
 
 const accountLink = computed(() => (auth.isAuthenticated ? '/cuenta/perfil' : '/auth/login'))
 const ordersLink = computed(() => (auth.isAuthenticated ? '/cuenta/compras' : '/auth/login'))
 </script>
 
 <template>
-  <footer class="mt-16 bg-dark-950 text-slate-300">
-    <div class="container-torox grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
-      <div>
+  <footer class="bg-dark-950 text-slate-300" :class="route.path === '/' ? '' : 'mt-16'">
+    <div class="container-torox grid gap-12 py-16 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+      <div class="max-w-sm">
         <div class="flex items-center gap-3">
-          <img :src="logo" alt="TOROX" class="h-12 w-auto object-contain drop-shadow-[0_0_14px_rgba(125,211,252,0.35)]" />
-          <span class="text-2xl font-black tracking-tight text-white">TOROX<span class="text-brand-400">.</span></span>
+          <img :src="logo" alt="" class="h-11 w-auto object-contain" />
+          <span class="font-display text-3xl text-white">TOROX</span>
         </div>
-        <p class="mt-4 text-sm leading-relaxed text-slate-400">
-          Soluciones avanzadas de seguridad para hogares y empresas. Tecnología diseñada para proteger tus espacios las 24 horas.
+        <p class="mt-5 leading-relaxed text-slate-400">
+          Cámaras, cerraduras inteligentes y accesorios de seguridad. Desde {{ STORE.area }} a todo el país.
         </p>
       </div>
 
       <div>
-        <h4 class="text-sm font-bold uppercase tracking-wider text-white">Tienda</h4>
-        <ul class="mt-4 space-y-2.5 text-sm">
-          <li><NuxtLink to="/productos" class="transition hover:text-white">Productos</NuxtLink></li>
-          <li><NuxtLink to="/productos?isFeatured=true" class="transition hover:text-white">Destacados</NuxtLink></li>
+        <h2 class="text-sm font-semibold text-white">Tienda</h2>
+        <ul class="mt-4 space-y-3 text-sm">
+          <li><NuxtLink to="/productos" class="hover:text-white">Todos los productos</NuxtLink></li>
+          <li><NuxtLink to="/productos?isFeatured=true" class="hover:text-white">Destacados</NuxtLink></li>
+          <li><NuxtLink to="/faq" class="hover:text-white">Preguntas frecuentes</NuxtLink></li>
         </ul>
       </div>
 
       <div>
-        <h4 class="text-sm font-bold uppercase tracking-wider text-white">Atención al cliente</h4>
-        <ul class="mt-4 space-y-2.5 text-sm">
-          <li><NuxtLink :to="accountLink" class="transition hover:text-white">Mi cuenta</NuxtLink></li>
-          <li><NuxtLink :to="ordersLink" class="transition hover:text-white">Mis compras</NuxtLink></li>
-          <li>
-            <a
-              href="https://envia.com/rastreo"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="transition hover:text-white"
-            >
-              Estado de pedidos
-            </a>
-          </li>
-          <li>
-            <a
-              :href="supportUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="transition hover:text-white"
-            >
-              Ayuda y soporte
-            </a>
-          </li>
+        <h2 class="text-sm font-semibold text-white">Tu compra</h2>
+        <ul class="mt-4 space-y-3 text-sm">
+          <li><NuxtLink :to="accountLink" class="hover:text-white">Mi cuenta</NuxtLink></li>
+          <li><NuxtLink :to="ordersLink" class="hover:text-white">Mis compras y seguimiento</NuxtLink></li>
+          <li><a :href="supportUrl" target="_blank" rel="noopener noreferrer" class="hover:text-white">Ayuda con un pedido</a></li>
         </ul>
       </div>
 
       <div>
-        <h4 class="text-sm font-bold uppercase tracking-wider text-white">Contacto</h4>
-        <ul class="mt-4 space-y-2.5 text-sm">
-          <li class="flex items-center gap-2.5"><Phone class="h-4 w-4 text-brand-400" />+54 9 11 7138-3512</li>
-          <li class="flex items-center gap-2.5"><Mail class="h-4 w-4 text-brand-400" /> toroxseguridad@gmail.com</li>
-          <li class="flex items-center gap-2.5"><MapPin class="h-4 w-4 text-brand-400" /> Buenos Aires, Argentina</li>
+        <h2 class="text-sm font-semibold text-white">Contacto</h2>
+        <ul class="mt-4 space-y-3 text-sm">
+          <li><a :href="whatsappLink()" target="_blank" rel="noopener noreferrer" class="hover:text-white">WhatsApp {{ STORE.whatsappDisplay }}</a></li>
+          <li><a :href="`mailto:${STORE.email}`" class="break-all hover:text-white">{{ STORE.email }}</a></li>
+          <li class="flex gap-3 pt-2">
+            <a :href="STORE.social.instagram" target="_blank" rel="noopener noreferrer" aria-label="Instagram de TOROX" class="transition hover:-translate-y-0.5">
+              <img :src="instagramIcon" alt="Instagram" width="40" height="40" class="h-10 w-10" />
+            </a>
+            <a :href="STORE.social.facebook" target="_blank" rel="noopener noreferrer" aria-label="Facebook de TOROX" class="transition hover:-translate-y-0.5">
+              <img :src="facebookIcon" alt="Facebook" width="40" height="40" class="h-10 w-10" />
+            </a>
+            <a :href="STORE.social.tiktok" target="_blank" rel="noopener noreferrer" aria-label="TikTok de TOROX" class="transition hover:-translate-y-0.5">
+              <img :src="tiktokIcon" alt="TikTok" width="40" height="40" class="h-10 w-10" />
+            </a>
+          </li>
         </ul>
-        <div class="mt-8">
-          <p class="text-[11px] font-semibold text-slate-300">Seguinos!</p>
-          <div class="mt-3 flex items-center gap-3">
-            <a
-              href="https://www.instagram.com/torox.arg/"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex h-8 w-8 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
-              aria-label="Instagram"
-            >
-              <img :src="Instagram" alt="Instagram" class="h-8 w-8 object-contain" />
-            </a>
-            <a
-              href="https://www.facebook.com/profile.php?id=61593927764597"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex h-8 w-8 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
-              aria-label="Facebook"
-            >
-              <img :src="Facebook" alt="Facebook" class="h-8 w-8 object-contain" />
-            </a>
-            <a
-              href="https://www.tiktok.com/@torox.arg"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex h-8 w-8 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
-              aria-label="TikTok"
-            >
-              <img :src="TikTok" alt="TikTok" class="h-8 w-8 object-contain" />
-            </a>
-            <a
-              href="https://wa.me/5491171383512?text=Hola!%20Quisiera%20saber%20m%C3%A1s%20informaci%C3%B3n%20sobre%20sus%20productos."
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex h-8 w-8 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-0.5 hover:scale-110"
-              aria-label="WhatsApp"
-            >
-              <img :src="WhatsApp" alt="WhatsApp" class="h-8 w-8 object-contain" />
-            </a>
-          </div>
+      </div>
+    </div>
+
+    <div class="border-t border-white/10">
+      <div class="container-torox flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-sm text-slate-400">Pagás con Mercado Pago: tarjetas de crédito, débito y dinero en cuenta.</p>
+        <div class="flex items-center gap-3">
+          <img :src="MercadoPago" alt="Mercado Pago" class="h-7 w-auto" />
+          <img :src="Visa" alt="Visa" class="h-7 w-auto rounded-[5px]" />
+          <img :src="Mastercard" alt="Mastercard" class="h-7 w-auto rounded-[5px]" />
+          <img :src="NaranjaX" alt="Naranja X" class="h-7 w-auto" />
         </div>
       </div>
     </div>
 
     <div class="border-t border-white/10">
-      <div class="container-torox flex flex-col gap-4 py-6 lg:flex-row lg:items-center lg:justify-between">
-        <p class="text-[11px] leading-relaxed text-slate-400">
-          Pagá con Mercado Pago, Tarjetas de crédito y débito de todos los bancos.
-        </p>
-        <div class="flex flex-nowrap items-center gap-3">
-          <img
-            :src="MercadoPago"
-            alt="Mercado Pago"
-            class="h-6 w-auto min-w-0 shrink object-contain sm:h-8"
-          />
-          <img
-            :src="Visa"
-            alt="Visa"
-            class="h-6 w-auto min-w-0 shrink rounded-[5px] object-contain shadow-sm ring-1 ring-white/15 sm:h-8"
-          />
-          <img
-            :src="Mastercard"
-            alt="Mastercard"
-            class="h-6 w-auto min-w-0 shrink rounded-[5px] object-contain shadow-sm ring-1 ring-white/15 sm:h-8"
-          />
-          <img
-            :src="NaranjaX"
-            alt="Naranja X"
-            class="h-6 w-auto min-w-0 shrink object-contain sm:h-8"
-          />
-        </div>
-      </div>
-    </div>
-
-    <div class="border-t border-white/10">
-      <div class="container-torox flex flex-col items-center justify-between gap-2 py-5 text-xs text-slate-500 sm:flex-row">
-        <p>© {{ new Date().getFullYear() }} TOROX Seguridad. Todos los derechos reservados.</p>
-        <p>Desarrollado por Clik — Torox</p>
+      <div class="container-torox flex flex-col justify-between gap-2 py-5 text-xs text-slate-500 sm:flex-row">
+        <p>© {{ new Date().getFullYear() }} TOROX Seguridad</p>
+        <p>Desarrollado por Clik</p>
       </div>
     </div>
   </footer>

@@ -1,152 +1,114 @@
 <script setup lang="ts">
-import { ThumbsUp, Star, ChevronLeft, ChevronRight, CalendarDays, Check } from 'lucide-vue-next'
+import { Star, BadgeCheck, Quote } from 'lucide-vue-next'
 
-const testimonials = [
+/**
+ * Opiniones de clientes reales de TOROX (confirmado por el equipo).
+ * Para sumar una nueva, agregá un objeto a la lista. No cargues opiniones
+ * inventadas: la sección dice "verificadas".
+ */
+const reviews = [
   {
     name: 'Martina',
-    location: 'Casa · Villa Urquiza',
+    place: 'Hogar · Villa Urquiza',
     initials: 'ML',
-    color: 'bg-gradient-to-br from-brand-500 to-brand-700',
-    text: 'Compré la cámara para mi bebé y la calidad de imagen es muy buena. La envíaron rápido y llegó en perfecto estado.',
+    text: 'Compré la cámara para mi bebé y la calidad de imagen es muy buena. La enviaron rápido y llegó en perfecto estado.',
     date: '12 de marzo de 2026',
   },
   {
     name: 'Gonzalo',
-    location: 'Empresa · Microcentro',
+    place: 'Empresa · Microcentro',
     initials: 'GP',
-    color: 'bg-gradient-to-br from-emerald-500 to-emerald-700',
     text: 'Equipamos nuestras dos sucursales con cámaras. Todo llegó completo y el monitoreo funciona a la perfección. Muy conformes.',
     date: '28 de febrero de 2026',
   },
   {
     name: 'Sofía',
-    location: 'Hogar · Belgrano',
+    place: 'Hogar · Belgrano',
     initials: 'SA',
-    color: 'bg-gradient-to-br from-rose-500 to-pink-700',
     text: 'Me compré una cerradura inteligente con huella y es un cambio total. La calidad del producto es primera y el envío fue puntual. Se nota que trabajan con buenas marcas.',
     date: '21 de enero de 2026',
   },
   {
     name: 'Julián',
-    location: 'Empresa · Avellaneda',
+    place: 'Empresa · Avellaneda',
     initials: 'JS',
-    color: 'bg-gradient-to-br from-cyan-500 to-sky-700',
     text: 'Compré las cámaras para el local y el seguimiento del pedido fue transparente. Todo llegó perfecto. Muy conforme.',
     date: '9 de enero de 2026',
   },
 ]
 
-const track = ref<HTMLElement | null>(null)
-
-function scrollByCard(direction: 1 | -1) {
-  const el = track.value
-  if (!el) return
-  const card = el.querySelector<HTMLElement>('[data-testimonial-card]')
-  const amount = card ? card.offsetWidth + 20 : 360
-  el.scrollBy({ left: direction * amount, behavior: 'smooth' })
-}
+const [featured, ...rest] = reviews
 </script>
 
 <template>
-  <section class="py-14 lg:py-20">
-    <div class="container-torox">
-      <div class="mx-auto mb-10 max-w-2xl text-center">
-        <span class="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-brand-600 underline">
-          <!-- <Star class="h-4 w-4 fill-current text-yellow-400" /> -->
+  <section class="bg-[#fff] py-16 dark:bg-dark-900 lg:py-24">
+    <div class="container-torox grid gap-10 lg:grid-cols-[0.9fr_2fr] lg:gap-14">
+      <!-- Encabezado -->
+      <div class="lg:sticky lg:top-32 lg:self-start">
+        <p class="label-brass flex items-center gap-2 !text-sm">
+          <BadgeCheck class="h-5 w-5" />
           Opiniones verificadas
-        </span>
-        <h2 class="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">Lo que opinan nuestros clientes</h2>
-        <p class="mt-2 text-slate-500">Familias y empresas ya confían en TOROX</p>
-      </div>
+        </p>
+        <h2 class="font-display mt-4 text-[2.1rem] text-slate-900 sm:text-5xl">
+          Lo que opinan <span class="text-gradient-torox">nuestros clientes</span>
+        </h2>
+        <p class="mt-4 text-lg text-slate-600">Familias y empresas ya confían en TOROX</p>
 
-      <div class="relative">
-        <div
-          ref="track"
-          class="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-4 pb-4"
-        >
-          <div
-            v-for="testimonial in testimonials"
-            :key="testimonial.name"
-            data-testimonial-card
-            class="relative w-[85%] shrink-0 snap-start sm:w-[380px]"
-          >
-            <div class="relative rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
-              <!-- Medal + author -->
-              <div class="flex items-center gap-3">
-                <span
-                  class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-amber-600 text-white shadow-md ring-2 ring-amber-300/60"
-                  title="Distinción del Cliente"
-                >
-                  <ThumbsUp class="h-5 w-5 fill-current" />
-                </span>
-                <div class="min-w-0">
-                  <p class="truncate text-xs font-black uppercase tracking-wider text-amber-600">
-                    Distinción del Cliente
-                  </p>
-                  <p class="truncate text-sm font-bold text-slate-900">{{ testimonial.name }}</p>
-                  <p class="truncate text-xs text-slate-500">{{ testimonial.location }}</p>
-                </div>
-                <span
-                  class="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black text-white shadow"
-                  :class="testimonial.color"
-                >
-                  {{ testimonial.initials }}
-                </span>
-              </div>
-
-              <!-- Stars -->
-              <div class="mt-4 flex items-center gap-1">
-                <Star v-for="star in 5" :key="star" class="h-4 w-4 fill-current text-yellow-400" />
-                <span class="ml-2 text-sm font-extrabold text-emerald-600">Excelente: 5/5</span>
-              </div>
-
-              <!-- Review -->
-              <p class="mt-3 text-sm leading-relaxed text-slate-600">
-                “{{ testimonial.text }}”
-              </p>
-
-              <!-- Date + stamp -->
-              <div class="mt-4 flex items-center justify-between border-t border-dashed border-slate-200 pt-3">
-                <span class="flex items-center gap-1.5 text-xs font-medium text-slate-400">
-                  <CalendarDays class="h-3.5 w-3.5" />
-                  {{ testimonial.date }}
-                </span>
-                <span
-                  class="flex rotate-[-8deg] items-center gap-1 rounded-md border-2 border-double border-emerald-500/70 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-emerald-600"
-                >
-                  <Check class="h-3 w-3" />
-                  Verificado
-                </span>
-              </div>
+        <div class="mt-8 flex items-center gap-4">
+          <span class="font-display text-6xl text-slate-900">5,0</span>
+          <div>
+            <div class="flex gap-0.5" aria-label="5 de 5 estrellas">
+              <Star v-for="i in 5" :key="i" class="h-5 w-5 fill-brass-400 text-brass-400" />
             </div>
-
-            <!-- Bubble tail -->
-            <span
-              class="absolute -bottom-1.5 left-10 h-4 w-4 rotate-45 border-b border-r border-slate-200 bg-white"
-            />
+            <p class="mt-1 text-sm text-slate-500">Promedio de {{ reviews.length }} opiniones</p>
           </div>
         </div>
+      </div>
 
-        <!-- Arrows (solo desktop: abajo, fuera del track para no tapar contenido) -->
-        <div
-          class="absolute pt-8 gap-4 left-1/2 top-full -translate-x-1/2 -translate-y-2 flex lg:flex"
+      <!-- Opiniones: en celular se deslizan de costado; en escritorio, grilla -->
+      <div class="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-2 md:gap-5 md:overflow-visible md:px-0">
+        <!-- Destacada -->
+        <figure
+          class="relative flex w-[86%] shrink-0 snap-start flex-col rounded-3xl bg-[#0d0e10] p-7 text-white ring-1 ring-brass-500/25 dark:bg-dark-800 md:col-span-2 md:w-auto md:p-9"
         >
-          <button
-            class="hidden h-11 w-11 -translate-y-3 items-center justify-center rounded-full bg-white text-slate-700 shadow-card transition hover:bg-brand-600 hover:text-white lg:flex"
-            aria-label="Anterior"
-            @click="scrollByCard(-1)"
-          >
-            <ChevronLeft class="h-5 w-5" />
-          </button>
-          <div class="h-11 w-px bg-slate-200 hidden lg:block" />
-          <button
-            class="hidden h-11 w-11 -translate-y-3 items-center justify-center rounded-full bg-white text-slate-700 shadow-card transition hover:bg-brand-600 hover:text-white lg:flex"
-            aria-label="Siguiente"
-            @click="scrollByCard(1)"
-          >
-            <ChevronRight class="h-5 w-5" />
-          </button>
-        </div>
+          <Quote class="absolute right-7 top-7 h-10 w-10 text-brass-500/50" aria-hidden="true" />
+          <div class="flex gap-0.5" aria-label="5 de 5 estrellas">
+            <Star v-for="i in 5" :key="i" class="h-4 w-4 fill-brass-400 text-brass-400" />
+          </div>
+          <blockquote class="mt-4 max-w-2xl text-lg leading-relaxed text-slate-100 md:text-2xl md:leading-snug">
+            “{{ featured.text }}”
+          </blockquote>
+          <figcaption class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span>
+              <span class="block font-semibold text-white">{{ featured.name }}</span>
+              <span class="block text-sm text-slate-400">{{ featured.place }} · {{ featured.date }}</span>
+            </span>
+            <span class="flex items-center gap-1.5 rounded-full bg-brass-400/15 px-3 py-1 text-xs font-semibold text-brass-300 md:ml-auto">
+              <BadgeCheck class="h-3.5 w-3.5" /> Compra verificada
+            </span>
+          </figcaption>
+        </figure>
+
+        <figure
+          v-for="review in rest"
+          :key="review.name"
+          class="flex w-[86%] shrink-0 snap-start flex-col rounded-3xl bg-[#f3f4f6] p-6 ring-1 ring-slate-900/[0.05] dark:bg-dark-800 dark:ring-white/[0.07] md:w-auto"
+          :class="review === rest[rest.length - 1] && rest.length % 2 === 1 ? 'md:col-span-2' : ''"
+        >
+          <div class="flex gap-0.5" aria-label="5 de 5 estrellas">
+            <Star v-for="i in 5" :key="i" class="h-4 w-4 fill-brass-400 text-brass-400" />
+          </div>
+          <blockquote class="mt-3 flex-1 leading-relaxed text-slate-700">“{{ review.text }}”</blockquote>
+          <figcaption class="mt-5 flex items-center gap-3 border-t border-slate-900/[0.08] pt-4 dark:border-white/10">
+            <span class="min-w-0 flex-1">
+              <span class="block truncate font-semibold text-slate-900">{{ review.name }}</span>
+              <span class="block truncate text-sm text-slate-500">{{ review.place }}</span>
+            </span>
+            <span class="flex shrink-0 items-center gap-1 text-xs font-semibold text-brass-700 dark:text-brass-400" :title="`Compra verificada · ${review.date}`">
+              <BadgeCheck class="h-4 w-4" /> Verificada
+            </span>
+          </figcaption>
+        </figure>
       </div>
     </div>
   </section>

@@ -488,7 +488,10 @@ export class OrdersService {
   }
 
   private async handlePaymentApproved(orderId: string, payment: Payment) {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    // Los items son necesarios: con ellos se calcula el peso, las medidas y el
+    // valor declarado del paquete. Sin la relación, la guía salía siempre con
+    // el paquete por defecto (0,5 kg) y valor declarado $0.
+    const order = await this.orderRepo.findOne({ where: { id: orderId }, relations: { items: true } });
     if (!order) throw new NotFoundException('Pedido no encontrado');
 
     order.status = OrderStatus.PAYMENT_APPROVED;

@@ -161,6 +161,33 @@ export class MailService {
     }
   }
 
+  /**
+   * Manda un mail de prueba y devuelve el resultado REAL de Resend (incluido el
+   * motivo del error). Lo usa el botón "Probar envío de mails" del admin.
+   */
+  async sendTest(email: string): Promise<{ ok: boolean; from: string; id?: string; error?: string }> {
+    if (!this.resend) {
+      return { ok: false, from: this.from, error: 'RESEND_API_KEY no está configurada.' };
+    }
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: this.from,
+        to: email,
+        subject: 'Prueba de envío — TOROX',
+        html: '<p>Si te llegó este mail, los envíos de TOROX funcionan correctamente.</p>',
+        text: 'Si te llegó este mail, los envíos de TOROX funcionan correctamente.',
+        ...(this.replyTo ? { replyTo: this.replyTo } : {}),
+      });
+      if (error) {
+        this.logger.error(`Mail de prueba falló: [${error.name}] ${error.message} (from: ${this.from})`);
+        return { ok: false, from: this.from, error: `[${error.name}] ${error.message}` };
+      }
+      return { ok: true, from: this.from, id: data?.id };
+    } catch (error: any) {
+      return { ok: false, from: this.from, error: error?.message ?? String(error) };
+    }
+  }
+
   /** Step 1 of the password reset: the 6-digit verification code. */
   async sendPasswordResetCode(
     email: string,

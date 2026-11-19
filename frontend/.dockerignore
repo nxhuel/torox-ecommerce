@@ -7,3 +7,6 @@ dist
 Dockerfile
 .dockerignore
 .env.example
+# El .env es para `npm run dev`: no se mete en la imagen de Docker
+# (la URL del backend llega por TOROX_API_BASE en docker-compose).
+.env

@@ -293,7 +293,7 @@ async function placeOrderWithMercadoPago() {
 
 <template>
   <div class="container-torox py-8 w-full overflow-x-hidden">
-    <h1 class="mb-8 text-2xl font-bold text-slate-900 sm:text-3xl">Finalizar compra</h1>
+    <h1 class="font-display mb-8 text-[2.1rem] text-slate-900 sm:text-5xl">Finalizar <span class="text-gradient-torox">compra</span></h1>
 
     <!-- Steps -->
     <ol class="mb-10 flex w-full min-w-0 items-center gap-0">
@@ -301,9 +301,9 @@ async function placeOrderWithMercadoPago() {
         <div class="flex flex-col items-center gap-1.5 sm:flex-row sm:gap-2.5">
           <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition"
             :class="step > s.number
-              ? 'bg-emerald-500 text-white'
+              ? 'bg-brass-500 text-[#0d0e10]'
               : step === s.number
-                ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30'
+                ? 'bg-torox text-white ring-4 ring-torox/20'
                 : 'bg-slate-200 text-slate-500'
               ">
             <Check v-if="step > s.number" class="h-4 w-4" />
@@ -315,7 +315,7 @@ async function placeOrderWithMercadoPago() {
           </span>
         </div>
         <div v-if="index < steps.length - 1" class="mx-2 h-0.5 flex-1 rounded sm:mx-3"
-          :class="step > s.number ? 'bg-emerald-500' : 'bg-slate-200'" />
+          :class="step > s.number ? 'bg-brass-500' : 'bg-slate-200'" />
       </li>
     </ol>
 
@@ -398,7 +398,7 @@ async function placeOrderWithMercadoPago() {
         </div>
 
         <div v-if="step === 3" class="card animate-fade-in-up p-6">
-          <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <div class="label-brass mb-2 flex items-center gap-2">
             <Truck class="h-4 w-4" /> Envío por <a href='https://www.envia.com/' target="_blank"
               class="underline">Envia.com</a>
           </div>
@@ -430,7 +430,7 @@ async function placeOrderWithMercadoPago() {
             <template v-else>
               <!-- Entrega a domicilio -->
               <div v-if="homeOptions.length">
-                <p class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <p class="label-brass mb-2 flex items-center gap-2">
                   <Home class="h-3.5 w-3.5" /> Entrega a domicilio
                 </p>
                 <div class="space-y-2">
@@ -443,6 +443,9 @@ async function placeOrderWithMercadoPago() {
                       <span class="flex flex-wrap items-center justify-between gap-2">
                         <span class="font-semibold text-slate-800">{{ option.carrierName }}</span>
                         <span class="font-bold text-slate-900">{{ currency(option.cost) }}</span>
+                      </span>
+                      <span v-if="option.deliveryEstimate || option.serviceDescription" class="mt-0.5 block text-xs text-slate-500">
+                        {{ option.serviceDescription || option.service }}<template v-if="option.deliveryEstimate"> · Llega en {{ option.deliveryEstimate }}</template>
                       </span>
                     </span>
                   </label>
@@ -458,7 +461,7 @@ async function placeOrderWithMercadoPago() {
 
         <!-- Step 4: Payment -->
         <div v-if="step === 4" class="card animate-fade-in-up p-6">
-          <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <div class="label-brass mb-2 flex items-center gap-2">
             <CreditCard class="h-4 w-4" /> Mercado Pago Checkout Pro
           </div>
           <h2 class="mb-5 text-lg font-bold text-slate-900">Pagar con Mercado Pago</h2>
@@ -471,7 +474,7 @@ async function placeOrderWithMercadoPago() {
 
             <div class="flex flex-col gap-3">
               <button
-                class="flex items-center justify-center gap-3 rounded-xl border-2 border-brand-500 bg-brand-500 px-8 py-4 text-white font-semibold transition hover:bg-brand-600 hover:shadow-lg hover:shadow-brand-500/30"
+                class="btn-primary gap-3 !px-8 !py-4 !text-base"
                 :disabled="processing"
                 @click="next"
               >

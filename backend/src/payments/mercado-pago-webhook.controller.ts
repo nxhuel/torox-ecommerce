@@ -12,6 +12,7 @@ import {
 import { MercadoPagoService } from './mercado-pago.service';
 import { PaymentsService } from './payments.service';
 import { OrdersService } from '../orders/orders.service';
+import { MercadoPagoSyncService } from './mercado-pago-sync.service';
 
 interface MercadoPagoWebhookNotification {
   id: string;
@@ -30,6 +31,7 @@ export class MercadoPagoWebhookController {
     private readonly mercadoPagoService: MercadoPagoService,
     private readonly paymentsService: PaymentsService,
     private readonly orderService: OrdersService,
+    private readonly sync: MercadoPagoSyncService,
   ) {}
 
   @Post('mercadopago')
@@ -128,32 +130,8 @@ export class MercadoPagoWebhookController {
 
   private async processOrderPayment(orderId: string, mpPayment: any) {
     try {
-      const payment = await this.paymentsService.findByOrder(orderId);
-      if (!payment) {
-        this.logger.warn(`No se encontró pago para el order ${orderId}`);
-        return;
-      }
-
-      if (payment.status === 'APPROVED') {
-        this.logger.log(`Order ${orderId} ya está aprobado`);
-        return;
-      }
-
-      // Verificar estado del pago en MercadoPago
-      const mpStatus = mpPayment.status;
-      this.logger.log(`MercadoPago payment status: ${mpStatus}`);
-
-      if (mpStatus === 'approved') {
-        // Actualizar orden y notificar
-        await this.orderService.approvePayment(orderId);
-        this.logger.log(`Order ${orderId} approved via webhook`);
-      } else if (mpStatus === 'rejected' || mpStatus === 'cancelled') {
-        // Rechazar pago
-        await this.paymentsService.reject(payment.id, 'Pago rechazado por MercadoPago');
-        this.logger.log(`Order ${orderId} rejected via webhook`);
-      } else {
-        this.logger.log(`Payment ${mpPayment.id} status: ${mpStatus} - waiting...`);
-      }
+      const result = await this.sync.applyPayment(orderId, mpPayment);
+      this.logger.log(`Webhook MP → pedido ${orderId}: ${result}`);
     } catch (error: any) {
       this.logger.error(`Error procesando order ${orderId}: ${error?.message}`);
     }

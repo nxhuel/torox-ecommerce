@@ -113,7 +113,7 @@ export class ShipmentsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   carriers() {
-    return this.envia.getCarriers();
+    return this.envia.getEnabledCarriers();
   }
 
   /**
@@ -175,6 +175,23 @@ export class ShipmentsController {
     return this.service.createForOrderById(orderId);
   }
 
+  /** Opciones de correo disponibles para un pedido sin guía (admin). */
+  @Get('order/:orderId/options')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  optionsForOrder(@Param('orderId') orderId: string) {
+    return this.service.optionsForOrder(orderId);
+  }
+
+  /** Cambia el correo de un pedido antes de generar la guía (admin). */
+  @Post('order/:orderId/option')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  changeOrderOption(@Param('orderId') orderId: string, @Body() body: { optionId: string }) {
+    if (!body?.optionId) throw new BadRequestException('optionId es requerido');
+    return this.service.changeOrderOption(orderId, body.optionId);
+  }
+
   @Post(':id/advance')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
@@ -204,6 +221,17 @@ export class ShipmentsController {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', buffer.length);
     res.send(buffer);
+  }
+
+  /**
+   * Anula la guía en Envia (pide el reintegro del costo de la etiqueta) y
+   * libera el pedido para generar una nueva. Sólo antes del despacho.
+   */
+  @Post(':id/cancel')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  cancel(@Param('id') id: string) {
+    return this.service.cancelShipment(id);
   }
 
   /** Sincroniza el estado del envío consultando la API de Envia. */

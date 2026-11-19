@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Clock, Loader2 } from 'lucide-vue-next'
 import { ordersService } from '~/services'
+import { useApi } from '~/composables/useApi'
 import { useCartStore } from '~/stores/cart'
 
 const route = useRoute()
@@ -8,10 +9,32 @@ const router = useRouter()
 const cart = useCartStore()
 const toast = useToast()
 
+const { api } = useApi()
 const orderId = computed(() => route.query.orderId as string)
 const order = ref<any>(null)
 const loading = ref(true)
 const error = ref('')
+
+/**
+ * Al volver de Mercado Pago le pedimos al backend que consulte a MP el estado
+ * real del pago. Así el pedido se confirma (y se genera la guía de envío)
+ * aunque el aviso automático (webhook) de Mercado Pago no llegue.
+ * MP a veces tarda unos segundos en registrar el pago: reintentamos.
+ */
+async function confirmWithMercadoPago(id: string): Promise<string> {
+  let status = 'NOT_FOUND'
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await api<{ status: string }>(`/payments/mercadopago/confirm/${id}`, { method: 'POST' })
+      status = res.status
+      if (status !== 'NOT_FOUND' && status !== 'PENDING') return status
+    } catch {
+      /* si falla seguimos: el webhook puede confirmarlo igual */
+    }
+    await new Promise((r) => setTimeout(r, 2500))
+  }
+  return status
+}
 
 onMounted(async () => {
   if (!orderId.value) {
@@ -21,6 +44,11 @@ onMounted(async () => {
   }
 
   try {
+    const status = await confirmWithMercadoPago(orderId.value)
+    if (status === 'APPROVED' || status === 'ALREADY_APPROVED') {
+      router.replace(`/checkout/success?orderId=${orderId.value}`)
+      return
+    }
     order.value = await ordersService.get(orderId.value)
     toast.info('Tu pago está siendo procesado. Recibirás una notificación cuando sea confirmado.')
   } catch (err: any) {

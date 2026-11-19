@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CheckCircle, Loader2 } from 'lucide-vue-next'
 import { ordersService } from '~/services'
+import { useApi } from '~/composables/useApi'
 import { useCartStore } from '~/stores/cart'
 
 const route = useRoute()
@@ -8,10 +9,33 @@ const router = useRouter()
 const cart = useCartStore()
 const toast = useToast()
 
+const { api } = useApi()
 const orderId = computed(() => route.query.orderId as string)
 const order = ref<any>(null)
 const loading = ref(true)
 const error = ref('')
+const paymentStatus = ref('')
+
+/**
+ * Al volver de Mercado Pago le pedimos al backend que consulte a MP el estado
+ * real del pago. Así el pedido se confirma (y se genera la guía de envío)
+ * aunque el aviso automático (webhook) de Mercado Pago no llegue.
+ * MP a veces tarda unos segundos en registrar el pago: reintentamos.
+ */
+async function confirmWithMercadoPago(id: string): Promise<string> {
+  let status = 'NOT_FOUND'
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await api<{ status: string }>(`/payments/mercadopago/confirm/${id}`, { method: 'POST' })
+      status = res.status
+      if (status !== 'NOT_FOUND' && status !== 'PENDING') return status
+    } catch {
+      /* si falla seguimos: el webhook puede confirmarlo igual */
+    }
+    await new Promise((r) => setTimeout(r, 2500))
+  }
+  return status
+}
 
 onMounted(async () => {
   if (!orderId.value) {
@@ -21,8 +45,9 @@ onMounted(async () => {
   }
 
   try {
+    paymentStatus.value = await confirmWithMercadoPago(orderId.value)
     order.value = await ordersService.get(orderId.value)
-    
+
     // Clear the cart after successful purchase
     if (cart.cart) {
       await cart.clear()
@@ -58,7 +83,9 @@ onMounted(async () => {
       <div v-else-if="order" class="space-y-6">
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-8">
           <CheckCircle class="mx-auto h-16 w-16 text-emerald-600" />
-          <h1 class="mt-4 text-2xl font-bold text-emerald-900">¡Pago exitoso!</h1>
+          <h1 class="mt-4 text-2xl font-bold text-emerald-900">
+            {{ order.status === 'PENDING_PAYMENT' ? 'Estamos confirmando tu pago' : '¡Pago exitoso!' }}
+          </h1>
           <p class="mt-2 text-lg text-emerald-700">
             Tu pedido <strong>{{ order.orderNumber }}</strong> ha sido confirmado.
           </p>
@@ -72,7 +99,9 @@ onMounted(async () => {
           <div class="mt-4 space-y-2 text-sm">
             <div class="flex justify-between">
               <span class="text-slate-600">Estado</span>
-              <span class="font-semibold text-emerald-600">Pagado</span>
+              <span class="font-semibold" :class="order.status === 'PENDING_PAYMENT' ? 'text-amber-600' : 'text-emerald-600'">
+                {{ order.status === 'PENDING_PAYMENT' ? 'Confirmando con Mercado Pago' : 'Pagado' }}
+              </span>
             </div>
             <div class="flex justify-between">
               <span class="text-slate-600">Total pagado</span>

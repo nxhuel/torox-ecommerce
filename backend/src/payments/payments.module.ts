@@ -12,6 +12,7 @@ import { MockPaymentProvider } from './providers/mock-payment.provider';
 import { PAYMENT_PROVIDER } from './providers/payment-provider.interface';
 import { MercadoPagoWebhookController } from './mercado-pago-webhook.controller';
 import { OrdersModule } from '../orders/orders.module';
+import { MercadoPagoSyncService } from './mercado-pago-sync.service';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { OrdersModule } from '../orders/orders.module';
   providers: [
     PaymentsService,
     MercadoPagoService,
+    MercadoPagoSyncService,
     // For now, use MockPaymentProvider since Checkout Pro redirects
     // In production, you can switch to MercadoPagoService for the processPayment method
     {

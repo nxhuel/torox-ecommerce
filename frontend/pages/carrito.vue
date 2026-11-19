@@ -36,7 +36,7 @@ function productImage(item: any) {
 
 <template>
   <div class="container-torox py-8 overflow-x-hidden">
-    <h1 class="mb-8 text-2xl font-bold text-slate-900 sm:text-3xl">Mi carrito</h1>
+    <h1 class="font-display mb-8 text-[2.1rem] text-slate-900 sm:text-5xl">Mi <span class="text-gradient-torox">carrito</span></h1>
 
     <div v-if="cart.loading" class="space-y-4">
       <BaseSkeleton v-for="i in 3" :key="i" class="h-28 !rounded-xl" />

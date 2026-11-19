@@ -3,6 +3,7 @@ import { Send, Loader2, Bell, Gift, Tag, Package, Truck, Info } from 'lucide-vue
 import type { Notification } from '~/types'
 import { notificationsService } from '~/services'
 import { NOTIFICATION_TYPE_LABELS, useFormat } from '~/composables/useFormat'
+import { useApi } from '~/composables/useApi'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
@@ -11,6 +12,22 @@ const toast = useToast()
 const notifications = ref<Notification[]>([])
 const loading = ref(true)
 const sending = ref(false)
+const testingMail = ref(false)
+const mailResult = ref<{ ok: boolean; from: string; error?: string } | null>(null)
+const { api } = useApi()
+
+/** Manda un mail de prueba al admin y muestra lo que respondió Resend. */
+async function testMail() {
+  testingMail.value = true
+  mailResult.value = null
+  try {
+    mailResult.value = await api('/mail/test', { method: 'POST' })
+  } catch (e: any) {
+    mailResult.value = { ok: false, from: '', error: e?.message }
+  } finally {
+    testingMail.value = false
+  }
+}
 
 const form = reactive({
   type: 'PROMOTION',
@@ -70,6 +87,25 @@ const typeStyles: Record<string, string> = {
 </script>
 
 <template>
+ <div>
+  <div class="mb-6 card p-5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-base font-bold text-slate-900">Mails (Resend)</h2>
+        <p class="text-sm text-slate-500">Manda un mail de prueba a tu casilla de admin para ver si los envíos funcionan.</p>
+      </div>
+      <button class="btn-secondary" :disabled="testingMail" @click="testMail">
+        <Loader2 v-if="testingMail" class="h-4 w-4 animate-spin" />
+        Probar envío de mails
+      </button>
+    </div>
+    <p v-if="mailResult?.ok" class="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
+      Resend aceptó el mail (remitente {{ mailResult.from }}). Revisá tu bandeja y la carpeta de spam.
+    </p>
+    <p v-else-if="mailResult" class="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+      No se pudo enviar: {{ mailResult.error }}<template v-if="mailResult.from"> (remitente {{ mailResult.from }})</template>
+    </p>
+  </div>
   <div class="grid gap-6 lg:grid-cols-2">
     <!-- Broadcast form -->
     <div class="card h-fit p-6">
@@ -143,4 +179,5 @@ const typeStyles: Record<string, string> = {
       <EmptyState v-else icon="bell" title="Sin notificaciones" description="Las notificaciones enviadas aparecerán acá." />
     </div>
   </div>
+ </div>
 </template>
