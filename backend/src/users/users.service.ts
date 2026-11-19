@@ -11,6 +11,11 @@ import { Shipment } from '../shipments/entities/shipment.entity';
 import { Cart } from '../cart/entities/cart.entity';
 import { FinanceMovement } from '../finance/entities/finance-movement.entity';
 
+/** Email en minúscula y sin espacios, para comparar y guardar siempre igual. */
+export function normalizeEmail(email: string | null | undefined): string {
+  return String(email ?? '').trim().toLowerCase();
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -19,11 +24,14 @@ export class UsersService {
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
-    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+    // Los emails se guardan siempre en minúscula y sin espacios: así
+    // "Juan@Gmail.com" y "juan@gmail.com" son la misma cuenta.
+    const email = normalizeEmail(dto.email);
+    const existing = await this.findByEmail(email);
     if (existing) throw new ConflictException('El email ya está registrado');
 
     const hash = await bcrypt.hash(dto.password, 12);
-    const user = this.userRepo.create({ ...dto, password: hash });
+    const user = this.userRepo.create({ ...dto, email, password: hash });
     return this.userRepo.save(user);
   }
 
@@ -37,12 +45,24 @@ export class UsersService {
     return user;
   }
 
+  /**
+   * Busca sin distinguir mayúsculas. Hace falta para las cuentas viejas que se
+   * registraron con mayúsculas (antes no se normalizaba el email).
+   */
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepo.findOne({ where: { email } });
+    const normalized = normalizeEmail(email);
+    if (!normalized) return null;
+    return this.userRepo
+      .createQueryBuilder('user')
+      .where('LOWER(TRIM(user.email)) = :email', { email: normalized })
+      .getOne();
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
+    if ((dto as { email?: string }).email) {
+      (dto as { email?: string }).email = normalizeEmail((dto as { email?: string }).email);
+    }
     if (dto.password) {
       dto.password = await bcrypt.hash(dto.password, 12);
     }

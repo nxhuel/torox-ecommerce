@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { randomInt } from 'crypto';
 import * as bcrypt from 'bcryptjs';
@@ -29,6 +35,8 @@ function generateResetCode(): string {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -62,6 +70,9 @@ export class AuthService {
   async forgotPassword(email: string): Promise<{ message: string }> {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
+      // Al usuario le respondemos lo mismo (no revelamos qué emails existen),
+      // pero queda en el log del servidor para poder diagnosticar.
+      this.logger.warn(`Recuperar contraseña: no hay ninguna cuenta con el email "${email}"`);
       return { message: GENERIC_RESET_MESSAGE };
     }
 
@@ -73,12 +84,22 @@ export class AuthService {
       codeHash,
       new Date(Date.now() + RESET_CODE_TTL_MINUTES * 60 * 1000),
     );
-    await this.mailService.sendPasswordResetCode(
+    const sent = await this.mailService.sendPasswordResetCode(
       user.email,
       user.firstName,
       code,
       RESET_CODE_TTL_MINUTES,
     );
+    if (!sent) {
+      // Antes se respondía "te enviamos un código" aunque Resend hubiera
+      // fallado, y el usuario se quedaba esperando un mail que nunca llegaba.
+      // El motivo exacto queda en el log (MailService: "Failed to send email").
+      await this.usersService.clearResetCode(user.id);
+      throw new ServiceUnavailableException(
+        'No pudimos enviarte el código en este momento. Probá de nuevo en unos minutos o escribinos por WhatsApp.',
+      );
+    }
+    this.logger.log(`Recuperar contraseña: código enviado a ${user.email}`);
 
     return { message: GENERIC_RESET_MESSAGE };
   }
